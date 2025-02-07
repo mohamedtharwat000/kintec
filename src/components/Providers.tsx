@@ -3,7 +3,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { ThemeProvider } from "next-themes";
-import { AuthWrapper } from "@/components/Auth";
 import { useState } from "react";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -27,7 +26,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         enableSystem
         disableTransitionOnChange
       >
-        <AuthWrapper>{children}</AuthWrapper>
+        {children}
       </ThemeProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>

@@ -5,8 +5,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { LogOut, Mail } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export function Header() {
+  const { isAuthenticated } = useAuthStore();
   const { logout } = useAuth();
   const router = useRouter();
 
@@ -27,14 +29,16 @@ export function Header() {
 
         <div className="flex items-center gap-4">
           <ThemeToggle />
-          <Button
-            variant="outline"
-            onClick={handleLogout}
-            className="flex items-center gap-2 hover:bg-destructive hover:text-destructive-foreground transition-colors"
-          >
-            <LogOut className="h-4 w-4" />
-            <span>Logout</span>
-          </Button>
+          {isAuthenticated && (
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              className="flex items-center gap-2 hover:bg-destructive hover:text-destructive-foreground transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Logout</span>
+            </Button>
+          )}
         </div>
       </div>
     </header>

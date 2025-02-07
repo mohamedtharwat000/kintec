@@ -17,6 +17,7 @@ interface MessageListProps {
   page: number;
   totalPages: number;
   onPageChange: (newPage: number) => void;
+  onMessageSelect: (uid: number) => void;
 }
 
 export function MessageList({
@@ -25,6 +26,7 @@ export function MessageList({
   page,
   totalPages,
   onPageChange,
+  onMessageSelect,
 }: MessageListProps) {
   if (loading) {
     return (
@@ -47,7 +49,11 @@ export function MessageList({
           </TableHeader>
           <TableBody>
             {messages.map((message) => (
-              <TableRow key={message.uid}>
+              <TableRow
+                key={message.uid}
+                className="cursor-pointer hover:bg-muted/50"
+                onClick={() => onMessageSelect(message.uid)}
+              >
                 <TableCell>
                   {message.envelope.from?.[0]?.name ||
                     message.envelope.from?.[0]?.address}

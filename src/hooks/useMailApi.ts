@@ -1,13 +1,13 @@
 import axiosClient from "@/lib/axios";
+import { MailboxObject } from "imapflow";
 import {
   useMutation,
   useQuery,
   type UseMutationOptions,
   type UseQueryOptions,
 } from "@tanstack/react-query";
-import { MessageListResult } from "@/types/email";
-import { MailboxObject } from "imapflow";
 import type { ServerInfo } from "@/types/server";
+import { MessageListResult, CustomMessageObject } from "@/types/email";
 
 const defaultQueryOptions = {
   staleTime: 60 * 60 * 1000,
@@ -63,6 +63,30 @@ export function useMailboxMessages(
       return data;
     },
     enabled: !!mailboxPath,
+    ...options,
+  });
+}
+
+export function useMessage(
+  mailboxPath: string | null,
+  uid: number | null,
+  options?: UseQueryOptions<CustomMessageObject>
+) {
+  return useQuery<CustomMessageObject>({
+    ...defaultQueryOptions,
+    queryKey: ["message", mailboxPath, uid],
+    queryFn: async () => {
+      if (!mailboxPath || !uid) throw new Error("Missing mailbox path or UID");
+      const encodedPath = encodeURIComponent(mailboxPath);
+      const { data } = await axiosClient.get(
+        `/api/mailboxes/${encodedPath}/messages/${uid}`
+      );
+      if (!data.success) {
+        throw new Error(data.error || "Failed to fetch message");
+      }
+      return data.message;
+    },
+    enabled: !!mailboxPath && !!uid,
     ...options,
   });
 }

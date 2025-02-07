@@ -62,7 +62,7 @@ export default function LoginForm() {
   }, [isError, error]);
 
   return (
-    <div className="h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="flex-1 flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       <Card className="w-[450px] shadow-lg">
         <CardHeader className="space-y-2">
           <CardTitle className="text-2xl font-bold text-center">
@@ -97,15 +97,12 @@ export default function LoginForm() {
                 Google
               </Button>
               <Button variant="outline" className="w-full" type="button">
-                <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                  <path
-                    d="M21.1789 5.0291H2.82111C1.26233 5.0291 0 6.29143 0 7.85021V16.1498C0 17.7086 1.26233 18.9709 2.82111 18.9709H21.1789C22.7377 18.9709 24 17.7086 24 16.1498V5.0291C24 6.29143 22.7377 5.0291 21.1789 5.0291Z"
-                    fill="#0078D4"
-                  />
-                  <path
-                    d="M12 11.9999L0 5.0291V16.1498C0 17.7086 1.26233 18.9709 2.82111 18.9709H21.1789C22.7377 18.9709 24 17.7086 24 16.1498V5.0291L12 11.9999Z"
-                    fill="#0078D4"
-                  />
+                <svg className="mr-2 h-4 w-4" viewBox="0 0 23 23">
+                  <path d="M0 0h23v23H0z" fill="#f3f3f3" />
+                  <path d="M1 1h10v10H1z" fill="#f35325" />
+                  <path d="M12 1h10v10H12z" fill="#81bc06" />
+                  <path d="M1 12h10v10H1z" fill="#05a6f0" />
+                  <path d="M12 12h10v10H12z" fill="#ffba08" />
                 </svg>
                 Microsoft
               </Button>

@@ -1,12 +1,44 @@
 import { NextResponse } from "next/server";
-import { ClientCompany } from "@/types/client";
+import { Contractor } from "@/types/contractor";
 
 export async function GET() {
-  const dummyClients: ClientCompany[] = [
+  const dummyContractors: Contractor[] = [
     {
-      client_company_id: "client1",
-      client_company_name: "ACME Corp",
-      contact_email: "contact@acme.com",
+      contractor_id: "contractor1",
+      first_name: "John",
+      middle_name: "A",
+      last_name: "Doe",
+      date_of_birth: "1990-01-01",
+      email_address: "john.doe@example.com",
+      phone_number: "1234567890",
+      nationality: "American",
+      address: "123 Main St",
+      country_of_residence: "USA",
+      bank_details: [
+        {
+          bank_detail_id: "bank1",
+          contractor_id: "contractor1",
+          bank_name: "Bank of America",
+          account_number: "11111111",
+          IBAN: "US00",
+          SWIFT: "BOFAUS3N",
+          currency: "USD",
+        },
+      ],
+      visa_details: [
+        {
+          visa_detail_id: "visa1",
+          contractor_id: "contractor1",
+          visa_number: "VISA123",
+          visa_type: "Work",
+          visa_country: "USA",
+          visa_expiry_date: "2025-12-31",
+          visa_status: "Active",
+          visa_sponsor: "Company",
+          country_id_number: "ID123",
+          country_id_type: "Passport",
+        },
+      ],
       contracts: [
         {
           contract_id: "contract1",
@@ -85,9 +117,40 @@ export async function GET() {
       ],
     },
     {
-      client_company_id: "client2",
-      client_company_name: "Beta Inc",
-      contact_email: "hello@beta.com",
+      contractor_id: "contractor2",
+      first_name: "Alice",
+      last_name: "Smith",
+      date_of_birth: "1985-05-05",
+      email_address: "alice.smith@example.com",
+      phone_number: "9876543210",
+      nationality: "British",
+      address: "456 Secondary St",
+      country_of_residence: "UK",
+      bank_details: [
+        {
+          bank_detail_id: "bank2",
+          contractor_id: "contractor2",
+          bank_name: "HSBC",
+          account_number: "22222222",
+          IBAN: "UK00",
+          SWIFT: "HBUKGB4B",
+          currency: "GBP",
+        },
+      ],
+      visa_details: [
+        {
+          visa_detail_id: "visa2",
+          contractor_id: "contractor2",
+          visa_number: "VISA456",
+          visa_type: "Tourist",
+          visa_country: "UK",
+          visa_expiry_date: "2024-06-30",
+          visa_status: "Active",
+          visa_sponsor: "UK Gov",
+          country_id_number: "ID456",
+          country_id_type: "Driver License",
+        },
+      ],
       contracts: [
         {
           contract_id: "contract2",
@@ -167,7 +230,7 @@ export async function GET() {
     },
   ];
 
-  return NextResponse.json<{ clients: ClientCompany[] }>({
-    clients: dummyClients,
+  return NextResponse.json<{ contractors: Contractor[] }>({
+    contractors: dummyContractors,
   });
 }

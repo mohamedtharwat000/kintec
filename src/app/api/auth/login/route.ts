@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
     const serverInfo: ServerInfo = {
       host: serverConfig.host,
       port: serverConfig.port,
+      secure: true,
       auth: { user: email, pass: password },
     };
 
