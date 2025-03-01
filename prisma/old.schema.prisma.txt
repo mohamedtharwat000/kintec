@@ -1,0 +1,159 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model contractor {
+  contractor_id        String           @id @default(uuid()) @db.Char(36)
+  first_name           String
+  middle_name          String?
+  last_name            String
+  date_of_birth        DateTime
+  email_address        String
+  phone_number         String
+  nationality          String
+  address              String
+  country_of_residence String
+  bank_details         bank_detail[]
+  visa_details         visa_detail[]
+  contracts            contract[]
+}
+
+model bank_detail {
+  bank_detail_id String   @id @default(uuid()) @db.Char(36)
+  contractor_id  String   @db.Char(36)
+  contractor     contractor @relation(fields: [contractor_id], references: [contractor_id])
+  bank_name      String
+  account_number String
+  IBAN           String
+  SWIFT          String
+  currency       String
+
+  @@unique([contractor_id, IBAN, SWIFT])
+}
+
+model visa_detail {
+  visa_detail_id    String         @id @default(uuid()) @db.Char(36)
+  contractor_id     String         @db.Char(36)
+  contractor        contractor     @relation(fields: [contractor_id], references: [contractor_id])
+  visa_number       String
+  visa_type         String
+  visa_country      String
+  visa_expiry_date  DateTime
+  visa_status       visa_status
+  visa_sponsor      String
+  country_id_number String
+  country_id_type   country_id_type
+
+  @@unique([contractor_id, visa_number, visa_country])
+}
+
+model client_company {
+  client_company_id String     @id @default(uuid()) @db.Char(36)
+  client_name       String
+  contact_email     String     @unique
+  contracts         contract[]
+}
+
+model contract {
+  contract_id         String           @id @default(uuid()) @db.Char(36)
+  contractor_id       String           @db.Char(36)
+  client_company_id   String           @db.Char(36)
+  contract_start_date DateTime
+  contract_end_date   DateTime
+  job_title           String
+  job_type            String
+  contract_status     contract_status
+  contractor          contractor       @relation(fields: [contractor_id], references: [contractor_id])
+  client_company      client_company   @relation(fields: [client_company_id], references: [client_company_id])
+  purchase_order      purchase_order?
+}
+
+model purchase_order {
+  PO_id                     String        @id @default(uuid()) @db.Char(36)
+  PO_start_date             DateTime
+  PO_end_date               DateTime
+  contract_id               String        @unique @db.Char(36)
+  contract                  contract      @relation(fields: [contract_id], references: [contract_id])
+  PO_total_value            Decimal
+  PO_status                 PO_status
+  kintec_email_for_remittance String
+  rates                     rate[]
+  invoices                  invoice[]
+}
+
+model rate {
+  rate_id          String        @id @default(uuid()) @db.Char(36)
+  PO_id            String        @db.Char(36)
+  purchase_order   purchase_order @relation(fields: [PO_id], references: [PO_id])
+  rate_type        rate_type
+  rate_frequency   rate_frequency
+  rate_value       Decimal
+  rate_currency    String
+}
+
+model invoice {
+  invoice_id          String        @id @default(uuid()) @db.Char(36)
+  PO_id               String        @db.Char(36)
+  purchase_order      purchase_order @relation(fields: [PO_id], references: [PO_id])
+  billing_period      DateTime
+  invoice_status      invoice_status
+  invoice_total_value Decimal
+  invoice_currency    String
+}
+
+enum contract_status {
+  active
+  terminated
+  expired
+}
+
+enum PO_status {
+  active
+  cancelled
+  expired
+}
+
+enum invoice_status {
+  pending
+  paid
+}
+
+enum rate_type {
+  rate_to_man_day
+  charge_rate
+  allowance
+  travel_day
+  travel_day_charge_rate
+  overtime_rate_to_man
+  overtime_charge_rate
+  recruitment_lump_sum
+}
+
+enum rate_frequency {
+  hourly
+  monthly
+  daily
+}
+
+enum visa_status {
+  active
+  revoked
+  expired
+}
+
+enum country_id_type {
+  national_id
+  passport
+  other
+}

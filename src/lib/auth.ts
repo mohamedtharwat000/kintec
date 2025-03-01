@@ -1,42 +1,25 @@
-"use server";
+import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials";
 
-import { cookies } from "next/headers";
-import { getIronSession } from "iron-session";
-import { ServerInfo } from "@/types/server";
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  providers: [
+    Credentials({
+      credentials: {
+        username: { label: "Username", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      authorize: async (credentials) => {
+        const { username, password } = credentials as {
+          username: string;
+          password: string;
+        };
+        console.log(credentials);
 
-const sessionOptions = {
-  cookieName: "email-client-session",
-  password: process.env.SESSION_SECRET!,
-};
-
-export async function getServerInfo(): Promise<ServerInfo> {
-  const sessionCookies = await cookies();
-  const session = await getIronSession<ServerInfo>(
-    sessionCookies,
-    sessionOptions
-  );
-
-  if (!session.host || !session.port || !session.auth?.user) {
-    throw new Error("Not authenticated");
-  }
-
-  return {
-    host: session.host,
-    port: session.port,
-    auth: session.auth,
-  };
-}
-
-export async function setServerInfo(serverInfo: ServerInfo) {
-  const sessionCookies = await cookies();
-  const session = await getIronSession<ServerInfo>(
-    sessionCookies,
-    sessionOptions
-  );
-
-  session.host = serverInfo.host;
-  session.port = serverInfo.port;
-  session.auth = serverInfo.auth;
-
-  await session.save();
-}
+        if (username === "criticalfuture" && password === "password") {
+          return { id: "1", name: "criticalfuture", username };
+        }
+        throw new Error("Invalid credentials.");
+      },
+    }),
+  ],
+});

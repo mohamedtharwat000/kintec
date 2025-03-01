@@ -2,57 +2,63 @@
 
 import { memo, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
-import { Providers } from "@/components/Providers";
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
-import { EmailClient } from "@/components/email";
-import { Sidebar } from "@/components/Sidebar";
-import { AuthWrapper } from "@/components/Auth";
-import { Clients } from "@/components/pages/clients";
-import { Employees } from "@/components/pages/contractors";
-import { Invoices } from "@/components/pages/invoices";
+import { AppSidebar } from "@/components/Sidebar";
+import { ClientCompany } from "@/components/pages/ClientCompany";
+import { Contractor } from "@/components/pages/contractor";
+import { Contract } from "@/components/pages/Contract";
+import { Project } from "@/components/pages/Project";
+import { SidebarInset, useSidebar } from "@/components/ui/sidebar";
+import { SiteHeader } from "@/components/header/site-header";
+import { useAppStore } from "@/store/useAppStore";
+import AppLogin from "@/components/Login";
 
 export function App() {
+  const { isAuthenticated } = useAppStore();
   const [currentView, setCurrentView] = useState<
-    "mail" | "clients" | "employees" | "invoices"
-  >("mail");
+    "contractors" | "companies" | "contracts" | "projects"
+  >("companies");
 
-  const handleNavigation = (view: "clients" | "employees" | "invoices") => {
+  const handleNavigation = (
+    view: "contractors" | "companies" | "contracts" | "projects"
+  ) => {
     setCurrentView(view);
+    if (window.innerWidth < 768) {
+      const { closeSidebar } = useSidebar();
+      closeSidebar();
+    }
   };
 
   return (
-    <div className="flex flex-col h-screen">
-      <Providers>
-        <Header />
-        <AuthWrapper>
-          <div className="flex flex-1 overflow-hidden">
-            {/* Sidebar with dummy mailbox callback */}
-            <div className="w-72 border-r">
-              <Sidebar
-                selectedMailbox="" // no longer used by App
-                currentView={currentView}
-                onMailboxSelect={() => setCurrentView("mail")}
-                onNavigation={handleNavigation}
-              />
+    <div className="flex flex-col h-screen [--header-height:calc(theme(spacing.14))]">
+      <SiteHeader showUserNav={isAuthenticated} />
+      <div className="flex-1">
+        {/* {!isAuthenticated ? (
+          <AppLogin />
+        ) : ( */}
+        <div className="flex flex-1 overflow-hidden">
+          <AppSidebar
+            currentView={currentView}
+            onNavigation={handleNavigation}
+          />
+          <SidebarInset className="w-full">
+            <div className="flex flex-1 p-2 sm:p-4 overflow-auto w-full">
+              <div className="w-full">
+                {currentView === "contractors" && <Contractor />}
+                {currentView === "companies" && <ClientCompany />}
+                {currentView === "contracts" && <Contract />}
+                {currentView === "projects" && <Project />}
+              </div>
             </div>
-            {/* Render the current view */}
-            <div className="flex-1 overflow-auto">
-              {currentView === "mail" && <EmailClient />}
-              {currentView === "clients" && <Clients />}
-              {currentView === "employees" && <Employees />}
-              {currentView === "invoices" && <Invoices />}
-            </div>
-          </div>
-        </AuthWrapper>
-        <Footer />
-        <Toaster
-          richColors
-          closeButton
-          position="top-right"
-          toastOptions={{ duration: 5000 }}
-        />
-      </Providers>
+          </SidebarInset>
+        </div>
+        {/* )} */}
+      </div>
+      <Toaster
+        richColors
+        closeButton
+        position="top-right"
+        toastOptions={{ duration: 5000 }}
+      />
     </div>
   );
 }

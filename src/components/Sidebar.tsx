@@ -1,62 +1,141 @@
-import { Button } from "@/components/ui/button";
-import { Mail, Users, UserSquare2, FileText } from "lucide-react";
-import { MailboxObject } from "imapflow";
-import { useMailboxes } from "@/hooks/useMailApi";
+"use client";
+
+import * as React from "react";
+import { Building2, Users, FileText, Briefcase } from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+} from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 
 interface SidebarProps {
-  selectedMailbox: string;
-  currentView: "mail" | "clients" | "employees" | "invoices";
-  onMailboxSelect: (mailbox: MailboxObject) => void;
-  onNavigation: (view: "clients" | "employees" | "invoices") => void;
+  currentView: "contractors" | "companies" | "contracts" | "projects";
+  onNavigation: (
+    view: "contractors" | "companies" | "contracts" | "projects"
+  ) => void;
 }
 
-export function Sidebar({
-  selectedMailbox,
-  currentView,
-  onMailboxSelect,
-  onNavigation,
-}: SidebarProps) {
-  const { data: mailboxes = [] } = useMailboxes();
-  const allMail = mailboxes[0];
-
+export function AppSidebar({ currentView, onNavigation }: SidebarProps) {
   return (
-    <div className="p-4 space-y-4">
-      <div className="space-y-1">
-        {allMail && (
-          <Button
-            variant={selectedMailbox === allMail.path ? "secondary" : "ghost"}
-            className="w-full justify-start"
-            onClick={() => onMailboxSelect(allMail)}
-          >
-            <Mail className="mr-2 h-4 w-4" />
-            <span>All Mail</span>
-          </Button>
-        )}
-        <Button
-          variant={currentView === "clients" ? "secondary" : "ghost"}
-          className="w-full justify-start"
-          onClick={() => onNavigation("clients")}
-        >
-          <Users className="mr-2 h-4 w-4" />
-          <span>Clients</span>
-        </Button>
-        <Button
-          variant={currentView === "employees" ? "secondary" : "ghost"}
-          className="w-full justify-start"
-          onClick={() => onNavigation("employees")}
-        >
-          <UserSquare2 className="mr-2 h-4 w-4" />
-          <span>Contractors</span>
-        </Button>
-        <Button
-          variant={currentView === "invoices" ? "secondary" : "ghost"}
-          className="w-full justify-start"
-          onClick={() => onNavigation("invoices")}
-        >
-          <FileText className="mr-2 h-4 w-4" />
-          <span>Invoices</span>
-        </Button>
-      </div>
-    </div>
+    <Sidebar className="top-[--header-height] !h-[calc(100svh-var(--header-height))] w-[270px] border-r md:translate-x-0 md:static absolute z-40 bg-background">
+      <SidebarContent className="p-2">
+        <SidebarGroup>
+          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={currentView === "companies"}
+                  onClick={() => onNavigation("companies")}
+                  className={cn(
+                    "cursor-pointer transition-all relative",
+                    "hover:bg-gray-100 dark:hover:bg-gray-800/40",
+                    currentView === "companies" && [
+                      "!bg-gray-200 !dark:bg-gray-800 font-medium text-primary",
+                      "shadow-sm",
+                    ]
+                  )}
+                >
+                  <div className="flex items-center">
+                    <Building2
+                      className={cn(
+                        "h-4 w-4 mr-2",
+                        currentView === "companies" && "text-primary"
+                      )}
+                    />
+                    <span>Client Companies</span>
+                  </div>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={currentView === "contractors"}
+                  onClick={() => onNavigation("contractors")}
+                  className={cn(
+                    "cursor-pointer transition-all relative",
+                    "hover:bg-gray-100 dark:hover:bg-gray-800/40",
+                    currentView === "contractors" && [
+                      "!bg-gray-200 !dark:bg-gray-800 font-medium text-primary",
+                      "shadow-sm",
+                    ]
+                  )}
+                >
+                  <div className="flex items-center">
+                    <Users
+                      className={cn(
+                        "h-4 w-4 mr-2",
+                        currentView === "contractors" && "text-primary"
+                      )}
+                    />
+                    <span>Contractors</span>
+                  </div>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={currentView === "contracts"}
+                  onClick={() => onNavigation("contracts")}
+                  className={cn(
+                    "cursor-pointer transition-all relative",
+                    "hover:bg-gray-100 dark:hover:bg-gray-800/40",
+                    currentView === "contracts" && [
+                      "!bg-gray-200 !dark:bg-gray-800 font-medium text-primary",
+                      "shadow-sm",
+                    ]
+                  )}
+                >
+                  <div className="flex items-center">
+                    <FileText
+                      className={cn(
+                        "h-4 w-4 mr-2",
+                        currentView === "contracts" && "text-primary"
+                      )}
+                    />
+                    <span>Contracts</span>
+                  </div>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={currentView === "projects"}
+                  onClick={() => onNavigation("projects")}
+                  className={cn(
+                    "cursor-pointer transition-all relative",
+                    "hover:bg-gray-100 dark:hover:bg-gray-800/40",
+                    currentView === "projects" && [
+                      "!bg-gray-200 !dark:bg-gray-800 font-medium text-primary",
+                      "shadow-sm",
+                    ]
+                  )}
+                >
+                  <div className="flex items-center">
+                    <Briefcase
+                      className={cn(
+                        "h-4 w-4 mr-2",
+                        currentView === "projects" && "text-primary"
+                      )}
+                    />
+                    <span>Projects</span>
+                  </div>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+    </Sidebar>
   );
 }

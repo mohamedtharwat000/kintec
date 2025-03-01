@@ -1,21 +1,52 @@
 import { ImapFlow, MailboxLockObject, ListResponse } from "imapflow";
-import { MessageListResult, CustomMessageObject, ServerInfo } from "@/types";
+import { MessageListResult, CustomMessageObject } from "@/types/Project";
+import { ServerInfo } from "@/types/server";
 import { simpleParser } from "mailparser";
+import z from "zod";
 
 /**
- * Class for managing connections and operations with an IMAP email server.
+ * +------------------------------------------------+
+ * |                IMAPWorker                      |
+ * +------------------------------------------------+
+ * | - clients: Map<string, IMAPWorker>             |
+ * | - connectionKey: string                        |
+ * | - client: ImapFlow | null                       |
+ * | - connectionInfo: ServerInfo | null             |
+ * | - mailboxLock: MailboxLockObject | null         |
+ * | - isConnecting: boolean                         |
+ * | - isConnected: boolean                          |
+ * | - isVerified: boolean                           |
+ * | - isLoggedOut: boolean                          |
+ * +------------------------------------------------+
+ * | + constructor(connection: ServerInfo)          |
+ * | + static async getClient(data: ServerInfo):      |
+ * |       Promise<IMAPWorker>                        |
+ * | + connect(): Promise<void>                       |
+ * | + disconnect(): Promise<void>                    |
+ * | + listMailboxes(): Promise<ListResponse[]>       |
+ * | + listMessages(...): Promise<MessageListResult>  |
+ * | + getMessage(...): Promise<CustomMessageObject>    |
+ * | - getIsVerified(): Promise<boolean>              |
+ * | - logOut(): Promise<void>                        |
+ * | - setupEventListeners(): void                    |
+ * | - handleConnectionIssue(): Promise<void>         |
+ * | - reconnect(): Promise<void>                     |
+ * +------------------------------------------------+
  */
 export class IMAPWorker {
-  /** Singleton instance of IMAPWorker. */
-  private static clients: { [key: ImapFlow["id"]]: ImapFlow } = {};
+  /** All class instances keyed by a unique connection string */
+  private static clients: Map<string, IMAPWorker> = new Map();
 
-  /** Connection configuration for the current instance. */
-  private connectionConfig: ServerInfo | null = null;
+  /** Unique key for the current connection (computed once in the constructor) */
+  private connectionKey: string;
 
   /** IMAP client instance. */
-  private client: ImapFlow | null = null;
+  private imapClient: ImapFlow | null = null;
 
-  /** Retrieves the IMAP server connection information. */
+  /** Connection configuration for the current instance. */
+  private connectionInfo: ServerInfo | null = null;
+
+  /** Holds the mailbox lock if one is active. */
   private mailboxLock: MailboxLockObject | null = null;
 
   /** Indicates if a connection attempt is in progress. */
@@ -27,136 +58,188 @@ export class IMAPWorker {
   /** Indicates if the connection is verified. */
   private isVerified: boolean = false;
 
+  /** Indicates if the user is logged out. */
+  private isLoggedOut: boolean = true;
+
+  /** Zod schema for validating ServerInfo */
+  private static serverInfoSchema = z.object({
+    host: z.string(),
+    port: z.number(),
+    secure: z.boolean(),
+    verifyOnly: z.boolean().optional(),
+    auth: z.object({
+      user: z.string(),
+      pass: z.string().optional(),
+      accessToken: z.string().optional(),
+    }),
+  });
+
   /**
-   * Initializes an IMAPWorker instance with the provided connection settings.
+   * Public constructor that initializes the IMAPWorker instance.
+   * Before creating a new instance, it checks if an instance with the same connection key
+   * already exists. If so, it returns that instance.
+   *
    * @param connection - IMAP server connection configuration.
-   * @throws Error if no connection configuration is provided.
+   * @throws Error if configuration is missing or invalid.
    */
-  private constructor(connection: ServerInfo) {
-    if (!connection) throw new Error("Connection configuration is required");
+  public constructor(connection: ServerInfo) {
+    if (!connection) {
+      throw new Error("Connection configuration is required");
+    }
+
+    // Validate connection configuration.
+    const validation = IMAPWorker.serverInfoSchema.safeParse(connection);
+    if (!validation.success) {
+      throw new Error(
+        `Invalid connection configuration: ${validation.error.message}`
+      );
+    }
+
+    // Compute the unique connection key and store it in a private property.
+    // This key is based on host, port, and user, so that identical configurations map to the same key.
+    this.connectionKey = `${connection.host}:${connection.port}:${connection.auth.user}`;
+
+    // Check if an instance already exists for this connection key.
+    const existingInstance = IMAPWorker.clients.get(this.connectionKey);
+    if (existingInstance) {
+      return existingInstance;
+    }
+
     console.log("Creating IMAP worker");
-    this.connectionConfig = connection;
-    this.client = new ImapFlow(connection);
-    IMAPWorker.clients[this.client.id] = this.client;
+
+    // No existing instance found; initialize properties.
+    this.connectionInfo = connection;
+    this.imapClient = new ImapFlow(connection);
+
+    // Register this new instance using the computed key.
+    IMAPWorker.clients.set(this.connectionKey, this);
   }
 
   /**
-   * Retrieves an existing IMAPFlow client by its ID.
-   * @param id - The client's unique identifier.
-   * @returns The corresponding IMAPFlow client.
-   * @throws Error if the client ID is missing or the client is not found.
+   * Retrieves an existing IMAP worker instance or creates a new instance if none exists.
+   * Ensures that the client is connected before returning.
+   * @param data - The server information required for connection.
+   * @returns A promise that resolves to the instance of IMAPWorker.
+   * @throws Error if the connection configuration is missing.
    */
-  public static async getClient(id: ImapFlow["id"]): Promise<ImapFlow> {
-    if (!id) throw new Error("Client ID is required");
-    console.log("Getting IMAP worker client");
+  public static async getClient(data: ServerInfo): Promise<IMAPWorker> {
+    console.log("Getting IMAP worker instance");
 
-    if (!IMAPWorker.clients[id]) throw new Error("Client not found");
+    if (!data) throw new Error("Connection configuration is required");
 
-    return IMAPWorker.clients[id];
+    // Compute the key using the same logic as in the constructor.
+    const key = `${data.host}:${data.port}:${data.auth.user}`;
+    let worker = IMAPWorker.clients.get(key);
+
+    // Create a new instance if one doesn't already exist.
+    if (!worker) {
+      worker = new IMAPWorker(data);
+    }
+
+    // Connect if the client is not yet authenticated.
+    if (!worker.imapClient || !worker.imapClient.authenticated) {
+      await worker.connect();
+    }
+
+    return worker;
   }
 
   /**
-   * Verifies the ability to establish a connection with the IMAP server.
+   * Verifies that the IMAP connection can be established.
+   * If already verified, it returns true immediately.
    * @returns True if the connection is verified; otherwise, false.
    */
   private async getIsVerified(): Promise<boolean> {
     console.log("Verifying IMAP connection");
 
-    if (!this.client || !this.connectionConfig) return false;
+    if (this.isVerified) {
+      console.log("Already verified");
+      return true;
+    }
+
+    if (!this.connectionInfo) return false;
 
     const client = new ImapFlow({
-      host: this.connectionConfig?.host,
-      port: this.connectionConfig?.port,
-      secure: this.connectionConfig?.secure,
+      host: this.connectionInfo.host,
+      port: this.connectionInfo.port,
+      secure: this.connectionInfo.secure,
       verifyOnly: true,
       auth: {
-        user: this.connectionConfig?.auth?.user,
-        pass: this.connectionConfig?.auth?.pass,
+        user: this.connectionInfo.auth.user,
+        pass: this.connectionInfo.auth.pass,
       },
     });
 
-    const isVerified = await client
+    return client
       .connect()
+      .then(() => client.logout())
       .then(() => {
-        client.logout();
+        this.isVerified = true;
+        this.isLoggedOut = true;
         return true;
       })
-      .catch((error) => {
-        console.error("Error verifying connection:", error);
-        return false;
-      });
-
-    if (isVerified) {
-      this.isVerified = true;
-      console.log("IMAP connection verified");
-    } else {
-      console.error("IMAP connection verification failed");
-    }
-
-    return isVerified;
+      .catch(() => false);
   }
 
   /**
-   * Registers event listeners to handle client errors and unexpected closures.
+   * Logs out the client if authenticated.
+   * Also resets connection flags appropriately.
+   */
+  private async logOut(): Promise<void> {
+    console.log("Logging out of IMAP server");
+
+    if (!this.imapClient) {
+      console.warn("No client instance to log out");
+      this.isLoggedOut = true;
+      this.isConnected = false;
+      return;
+    }
+
+    if (this.imapClient.authenticated) {
+      await this.imapClient.logout().catch(() => {
+        this.imapClient?.close();
+      });
+    }
+    this.isLoggedOut = true;
+    this.isConnected = false;
+  }
+
+  /**
+   * Sets up event listeners for handling errors and unexpected client closures.
    */
   private setupEventListeners(): void {
     console.log("Setting up IMAP event listeners");
 
-    this.client?.on("connection", () => {
-      console.log("someone connected!");
+    if (!this.imapClient) return;
+
+    this.imapClient.on("error", (err) => {
+      const error = err instanceof Error ? err : new Error("Unknown error");
+      console.error("IMAP error:", error);
+      this.handleConnectionIssue().catch((e) =>
+        console.error("Error handling connection issue:", e)
+      );
     });
 
-    this.client?.on("error", (error) => {
-      this.handleConnectionIssue(error instanceof Error ? error : undefined);
-    });
-
-    this.client?.on("close", () => {
-      this.handleConnectionIssue();
+    this.imapClient.on("close", () => {
+      if (this.isLoggedOut) return;
+      this.handleConnectionIssue().catch((e) =>
+        console.error("Error handling connection issue:", e)
+      );
     });
   }
 
   /**
-   * Handles IMAP connection issues and initiates a reconnection.
-   * @param error - Optional error that triggered the issue.
+   * Handles connection issues by marking the client as disconnected and triggering a reconnect.
    */
-  private async handleConnectionIssue(error?: Error): Promise<void> {
+  private async handleConnectionIssue(): Promise<void> {
     console.log("Handling IMAP connection issue");
-
     this.isConnected = false;
-
-    if (error) {
-      console.error(`IMAP error: ${error.message}`);
-    } else {
-      console.error("IMAP connection closed");
-    }
-
     await this.reconnect();
   }
 
   /**
-   * Initializes the IMAP client by verifying the connection and setting up event listeners.
-   */
-  private async initializeClient(): Promise<void> {
-    console.log("Initializing IMAP client");
-
-    if (!this.isVerified) {
-      const isVerified = await this.getIsVerified();
-
-      if (!isVerified) {
-        console.error("IMAP connection verification failed");
-        return;
-      }
-    }
-
-    this.setupEventListeners();
-
-    await this.connect().catch((error) =>
-      this.handleConnectionIssue(error instanceof Error ? error : undefined)
-    );
-  }
-
-  /**
    * Establishes a connection to the IMAP server.
+   * Performs double-checks on the client state to avoid redundant connections.
    * @throws Error if the connection attempt fails.
    */
   public async connect(): Promise<void> {
@@ -167,85 +250,108 @@ export class IMAPWorker {
       return;
     }
 
-    this.isConnecting = true;
+    // Verify connection if not already verified.
+    if (!this.isVerified) {
+      const verified = await this.getIsVerified();
+      if (!verified) {
+        console.error("Verification failed. Cannot connect.");
+        return Promise.reject(new Error("Verification failed."));
+      }
+    }
 
-    if (this.client?.authenticated) {
-      console.log("Already connected");
+    this.setupEventListeners();
+
+    if (
+      this.imapClient &&
+      this.imapClient.authenticated &&
+      this.isConnected &&
+      !this.isLoggedOut
+    ) {
+      console.log("Already connected and authenticated");
       return;
     }
 
-    try {
-      await this.client?.connect();
-      console.log("Connected to IMAP server");
-      this.isConnected = true;
-    } catch (error) {
-      console.error("Error connecting to IMAP server:", error);
-      throw error;
-    } finally {
-      this.isConnecting = false;
+    this.isConnecting = true;
+
+    if (!this.imapClient) {
+      if (!this.connectionInfo) {
+        this.isConnecting = false;
+        return Promise.reject(new Error("Connection information is missing"));
+      }
+      this.imapClient = new ImapFlow(this.connectionInfo);
+      // Use the stored connectionKey instead of recalculating it.
+      IMAPWorker.clients.set(this.connectionKey, this);
     }
+
+    return this.imapClient
+      .connect()
+      .then(() => {
+        console.log("Connected to IMAP server");
+        this.isConnected = true;
+        this.isLoggedOut = false;
+      })
+      .catch((error) => {
+        console.error("Error connecting to IMAP server:", error);
+        throw error;
+      })
+      .finally(() => {
+        this.isConnecting = false;
+      });
   }
 
   /**
-   * Disconnects from the IMAP server and releases any held resources.
+   * Disconnects from the IMAP server and cleans up resources.
    */
   public async disconnect(): Promise<void> {
     console.log("Disconnecting from IMAP server");
 
     if (this.mailboxLock) {
-      try {
-        this.mailboxLock.release();
-      } catch (error) {
-        console.error("Failed to release mailbox lock:", error);
-      } finally {
-        this.mailboxLock = null;
-      }
+      await Promise.resolve(this.mailboxLock.release())
+        .catch((error) =>
+          console.error("Failed to release mailbox lock:", error)
+        )
+        .finally(() => {
+          this.mailboxLock = null;
+        });
     }
 
-    if (this.client?.authenticated) {
-      await this.client.logout().catch((error) => {
-        console.error("Error logging out:", error);
-        console.log("Forcing client to close");
-        this.client?.close();
+    if (this.imapClient && this.imapClient.authenticated && !this.isLoggedOut) {
+      await this.logOut().catch((error) => {
+        console.error("Error during logout:", error);
+        this.imapClient?.close();
       });
     }
 
-    this.client = null;
+    this.imapClient = null;
     this.isConnected = false;
+    this.isLoggedOut = true;
   }
 
   /**
-   * Attempts to reconnect to the IMAP server by disconnecting and then reinitializing.
+   * Attempts to reconnect to the IMAP server.
    */
   private async reconnect(): Promise<void> {
     console.log("Reconnecting to IMAP server");
-
     if (this.isConnecting) return;
 
-    try {
-      await this.initializeClient();
-    } catch (error) {
-      console.error("Reconnection failed:", error);
-    }
+    await this.connect().catch(() => {
+      console.error("Reconnection failed.");
+    });
   }
 
   /**
    * Retrieves a list of available mailboxes.
    * @returns An array of mailbox information.
+   * @throws Error if the imapClient is not ready.
    */
   public async listMailboxes(): Promise<ListResponse[]> {
     console.log("Listing mailboxes");
 
-    try {
-      const list = await this.client?.list();
-      const allMailbox = list?.find(
-        (box) => box.path === "[Gmail]/All Mail" || box.path === "All Mail"
-      );
-      return allMailbox ? [allMailbox] : [];
-    } catch (error) {
-      console.error("Failed to list mailboxes:", error);
-      throw error;
+    if (!this.imapClient || !this.isConnected || this.isLoggedOut) {
+      return Promise.reject(new Error("IMAP imapClient is not ready"));
     }
+
+    return this.imapClient.list();
   }
 
   /**
@@ -256,59 +362,54 @@ export class IMAPWorker {
    * @returns An object containing the messages and pagination details.
    */
   public async listMessages(
-    path: string,
+    path: string = "[Gmail]/All Mail",
     page: number = 1,
     pageSize: number = 10
   ): Promise<MessageListResult> {
-    try {
-      if (!this.client) {
-        return { messages: [], page, totalPages: 0, totalMessages: 0 };
-      }
-
-      this.mailboxLock = await this.client.getMailboxLock(path);
-
-      const status = await this.client.status(path, { messages: true });
-      const totalMessages = status.messages || 0;
-      const totalPages = Math.ceil(totalMessages / pageSize);
-
-      const startIndex = (page - 1) * pageSize + 1;
-      const endIndex = Math.min(page * pageSize, totalMessages);
-      const range = `${startIndex}:${endIndex}`;
-
-      const fetchOptions = {
-        uid: true,
-        envelope: true,
-        flags: true,
-        bodyStructure: true,
-        size: true,
-      };
-
-      const messages = await this.client.fetchAll(range, fetchOptions);
-
-      return {
-        messages: messages.map(
-          (message): CustomMessageObject => ({
-            path,
-            uid: message.uid,
-            envelope: message.envelope,
-            flags: message.flags,
-            bodyStructure: message.bodyStructure,
-            size: message.size,
-          })
-        ),
-        page,
-        totalPages,
-        totalMessages,
-      };
-    } catch (error) {
-      console.error("Error listing messages:", error);
-      throw error;
-    } finally {
-      if (this.mailboxLock) {
-        await this.mailboxLock.release();
-        this.mailboxLock = null;
-      }
+    if (!this.imapClient || !this.isConnected || this.isLoggedOut) {
+      return Promise.reject(new Error("IMAP imapClient is not ready"));
     }
+
+    // Use a local mailbox lock to ensure proper release even in error cases.
+    return this.imapClient.getMailboxLock(path).then((lock) => {
+      return this.imapClient!.status(path, { messages: true })
+        .then((status) => {
+          const totalMessages = status.messages || 0;
+          const totalPages = Math.ceil(totalMessages / pageSize);
+          const startIndex = (page - 1) * pageSize + 1;
+          const endIndex = Math.min(page * pageSize, totalMessages);
+          const range = `${startIndex}:${endIndex}`;
+
+          const fetchOptions = {
+            uid: true,
+            envelope: true,
+            flags: true,
+            bodyStructure: true,
+            size: true,
+          };
+
+          return this.imapClient!.fetchAll(range, fetchOptions).then(
+            (messages) => ({
+              messages: messages.map(
+                (message): CustomMessageObject => ({
+                  path,
+                  uid: message.uid,
+                  envelope: message.envelope,
+                  flags: message.flags,
+                  bodyStructure: message.bodyStructure,
+                  size: message.size,
+                })
+              ),
+              page,
+              totalPages,
+              totalMessages,
+            })
+          );
+        })
+        .finally(() => {
+          lock.release();
+        });
+    });
   }
 
   /**
@@ -322,10 +423,12 @@ export class IMAPWorker {
     path: string,
     uid: number
   ): Promise<CustomMessageObject> {
-    try {
-      this.mailboxLock = (await this.client?.getMailboxLock(path)) ?? null;
+    if (!this.imapClient || !this.isConnected || this.isLoggedOut) {
+      return Promise.reject(new Error("IMAP imapClient is not ready"));
+    }
 
-      const message = await this.client?.fetchOne(
+    return this.imapClient.getMailboxLock(path).then((lock) => {
+      return this.imapClient!.fetchOne(
         String(uid),
         {
           uid: true,
@@ -336,37 +439,27 @@ export class IMAPWorker {
           source: true,
         },
         { uid: true }
-      );
-
-      if (!message) {
-        throw new Error("Message not found");
-      }
-
-      // Parse the email content
-      const parsed = await simpleParser(message.source);
-
-      return {
-        path,
-        uid: message.uid,
-        envelope: message.envelope,
-        flags: message.flags,
-        bodyStructure: message.bodyStructure,
-        size: message.size,
-        source: message.source,
-        parsed: {
-          html: parsed.html || null,
-          text: parsed.text || null,
-          attachments: parsed.attachments || [],
-        },
-      };
-    } catch (error) {
-      console.error("Error fetching message:", error);
-      throw error;
-    } finally {
-      if (this.mailboxLock) {
-        await this.mailboxLock.release();
-        this.mailboxLock = null;
-      }
-    }
+      )
+        .then((message) => {
+          if (!message) throw new Error("Message not found");
+          return simpleParser(message.source).then((parsed) => ({
+            path,
+            uid: message.uid,
+            envelope: message.envelope,
+            flags: message.flags,
+            bodyStructure: message.bodyStructure,
+            size: message.size,
+            source: message.source,
+            parsed: {
+              html: parsed.html || null,
+              text: parsed.text || null,
+              attachments: parsed.attachments || [],
+            },
+          }));
+        })
+        .finally(() => {
+          lock.release();
+        });
+    });
   }
 }
