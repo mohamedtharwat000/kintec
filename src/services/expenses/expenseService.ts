@@ -75,6 +75,52 @@ export const createExpense = async (data: {
   });
 };
 
+export const createExpenses = async (
+  data: Array<{
+    PO_id?: string;
+    CWO_id?: string;
+    expense_type: expense_type;
+    expense_frequency: expense_frequency;
+    expense_value: number;
+    expsense_currency: string;
+    pro_rata_percentage: number;
+  }>
+) => {
+  return prisma.$transaction(async (prisma) => {
+    const expenses = [];
+
+    for (const expenseData of data) {
+      // Ensure that exactly one of PO_id or CWO_id is provided.
+      if (
+        (!expenseData.PO_id && !expenseData.CWO_id) ||
+        (expenseData.PO_id && expenseData.CWO_id)
+      ) {
+        throw new Error("Exactly one of PO_id or CWO_id must be provided.");
+      }
+
+      const expense = await prisma.expense.create({
+        data: {
+          expense_type: expenseData.expense_type,
+          expense_frequency: expenseData.expense_frequency,
+          expense_value: expenseData.expense_value,
+          expsense_currency: expenseData.expsense_currency,
+          pro_rata_percentage: expenseData.pro_rata_percentage,
+          ...(expenseData.PO_id
+            ? { purchase_order: { connect: { PO_id: expenseData.PO_id } } }
+            : {}),
+          ...(expenseData.CWO_id
+            ? { calloff_work_order: { connect: { CWO_id: expenseData.CWO_id } } }
+            : {}),
+        },
+      });
+
+      expenses.push(expense);
+    }
+
+    return expenses;
+  });
+};
+
 export const updateExpense = async (
   id: string,
   data: {
