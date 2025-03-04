@@ -82,6 +82,59 @@ export const createInvoice = async (data: {
   });
 };
 
+export const createInvoices = async (
+  data: Array<{
+    PO_id?: string;
+    CWO_id?: string;
+    billing_period: string;
+    invoice_status: invoice_status;
+    invoice_type: invoice_type;
+    invoice_currency: string;
+    invoice_total_value: Decimal;
+    wht_rate?: number;
+    wht_applicable?: boolean;
+    external_assignment?: boolean;
+  }>
+) => {
+  return prisma.$transaction(async (prisma) => {
+    const invoices = [];
+
+    for (const invoiceData of data) {
+      // Ensure that exactly one of PO_id or CWO_id is provided.
+      if (
+        (!invoiceData.PO_id && !invoiceData.CWO_id) ||
+        (invoiceData.PO_id && invoiceData.CWO_id)
+      ) {
+        throw new Error("Exactly one of PO_id or CWO_id must be provided.");
+      }
+
+      const invoice = await prisma.invoice.create({
+        data: {
+          billing_period: new Date(invoiceData.billing_period),
+          invoice_status: invoiceData.invoice_status,
+          invoice_type: invoiceData.invoice_type,
+          invoice_currency: invoiceData.invoice_currency,
+          invoice_total_value: invoiceData.invoice_total_value,
+          wht_rate: invoiceData.wht_rate,
+          wht_applicable: invoiceData.wht_applicable,
+          external_assignment: invoiceData.external_assignment,
+          ...(invoiceData.PO_id
+            ? { purchase_order: { connect: { PO_id: invoiceData.PO_id } } }
+            : {}),
+          ...(invoiceData.CWO_id
+            ? { calloff_work_order: { connect: { CWO_id: invoiceData.CWO_id } } }
+            : {}),
+        },
+      });
+
+      invoices.push(invoice);
+    }
+
+    return invoices;
+  });
+};
+
+
 export const updateInvoice = async (
   id: string,
   data: {
