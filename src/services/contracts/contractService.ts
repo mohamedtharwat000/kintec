@@ -1,4 +1,4 @@
-import { ContractStatus } from "@/types/contract";
+import { contract_status } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export const getAllContracts = async () => {
@@ -37,7 +37,7 @@ export const createContract = async (data: {
   job_number: string;
   kintec_cost_centre_code: string;
   description_of_services: string;
-  contract_status: ContractStatus;
+  contract_status: contract_status;
 }) => {
   return prisma.contract.create({
     data: {

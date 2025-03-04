@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
-import {
-  getAllContractors,
-  createContractor,
-} from "@/services/contractors/contractorService";
+import { getAllReviews, createReview } from "@/services/reviews/reviewService";
 
 export async function GET() {
   try {
-    const contractors = await getAllContractors();
-    return NextResponse.json(contractors, { status: 200 });
+    const reviews = await getAllReviews();
+    return NextResponse.json(reviews, { status: 200 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -20,8 +17,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const newContractor = await createContractor(body);
-    return NextResponse.json(newContractor, { status: 201 });
+    const newReview = await createReview(body);
+    return NextResponse.json(newReview, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(

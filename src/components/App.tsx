@@ -6,7 +6,6 @@ import { AppSidebar } from "@/components/Sidebar";
 import { ClientCompany } from "@/components/pages/ClientCompany";
 import { Contractor } from "@/components/pages/contractor";
 import { Contract } from "@/components/pages/Contract";
-import { Project } from "@/components/pages/Project";
 import { SidebarInset, useSidebar } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/header/site-header";
 import { useAppStore } from "@/store/useAppStore";
@@ -15,11 +14,11 @@ import AppLogin from "@/components/Login";
 export function App() {
   const { isAuthenticated } = useAppStore();
   const [currentView, setCurrentView] = useState<
-    "contractors" | "companies" | "contracts" | "projects"
-  >("companies");
+    "contractors" | "companies" | "contracts"
+  >("contractors");
 
   const handleNavigation = (
-    view: "contractors" | "companies" | "contracts" | "projects"
+    view: "contractors" | "companies" | "contracts"
   ) => {
     setCurrentView(view);
     if (window.innerWidth < 768) {
@@ -46,7 +45,6 @@ export function App() {
                 {currentView === "contractors" && <Contractor />}
                 {currentView === "companies" && <ClientCompany />}
                 {currentView === "contracts" && <Contract />}
-                {currentView === "projects" && <Project />}
               </div>
             </div>
           </SidebarInset>

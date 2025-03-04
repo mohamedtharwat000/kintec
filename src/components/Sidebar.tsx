@@ -15,10 +15,8 @@ import {
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
-  currentView: "contractors" | "companies" | "contracts" | "projects";
-  onNavigation: (
-    view: "contractors" | "companies" | "contracts" | "projects"
-  ) => void;
+  currentView: "contractors" | "companies" | "contracts";
+  onNavigation: (view: "contractors" | "companies" | "contracts") => void;
 }
 
 export function AppSidebar({ currentView, onNavigation }: SidebarProps) {
@@ -32,40 +30,13 @@ export function AppSidebar({ currentView, onNavigation }: SidebarProps) {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={currentView === "companies"}
-                  onClick={() => onNavigation("companies")}
-                  className={cn(
-                    "cursor-pointer transition-all relative",
-                    "hover:bg-gray-100 dark:hover:bg-gray-800/40",
-                    currentView === "companies" && [
-                      "!bg-gray-200 !dark:bg-gray-800 font-medium text-primary",
-                      "shadow-sm",
-                    ]
-                  )}
-                >
-                  <div className="flex items-center">
-                    <Building2
-                      className={cn(
-                        "h-4 w-4 mr-2",
-                        currentView === "companies" && "text-primary"
-                      )}
-                    />
-                    <span>Client Companies</span>
-                  </div>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
                   isActive={currentView === "contractors"}
                   onClick={() => onNavigation("contractors")}
                   className={cn(
                     "cursor-pointer transition-all relative",
                     "hover:bg-gray-100 dark:hover:bg-gray-800/40",
                     currentView === "contractors" && [
-                      "!bg-gray-200 !dark:bg-gray-800 font-medium text-primary",
-                      "shadow-sm",
+                      "bg-gray-200 dark:bg-gray-800 font-medium text-primary",
                     ]
                   )}
                 >
@@ -84,14 +55,38 @@ export function AppSidebar({ currentView, onNavigation }: SidebarProps) {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
+                  isActive={currentView === "companies"}
+                  onClick={() => onNavigation("companies")}
+                  className={cn(
+                    "cursor-pointer transition-all relative",
+                    "hover:bg-gray-100 dark:hover:bg-gray-800/40",
+                    currentView === "companies" && [
+                      "bg-gray-200 dark:bg-gray-800 font-medium text-primary",
+                    ]
+                  )}
+                >
+                  <div className="flex items-center">
+                    <Building2
+                      className={cn(
+                        "h-4 w-4 mr-2",
+                        currentView === "companies" && "text-primary"
+                      )}
+                    />
+                    <span>Companies</span>
+                  </div>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
                   isActive={currentView === "contracts"}
                   onClick={() => onNavigation("contracts")}
                   className={cn(
                     "cursor-pointer transition-all relative",
                     "hover:bg-gray-100 dark:hover:bg-gray-800/40",
                     currentView === "contracts" && [
-                      "!bg-gray-200 !dark:bg-gray-800 font-medium text-primary",
-                      "shadow-sm",
+                      "bg-gray-200 dark:bg-gray-800 font-medium text-primary",
                     ]
                   )}
                 >
@@ -103,32 +98,6 @@ export function AppSidebar({ currentView, onNavigation }: SidebarProps) {
                       )}
                     />
                     <span>Contracts</span>
-                  </div>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={currentView === "projects"}
-                  onClick={() => onNavigation("projects")}
-                  className={cn(
-                    "cursor-pointer transition-all relative",
-                    "hover:bg-gray-100 dark:hover:bg-gray-800/40",
-                    currentView === "projects" && [
-                      "!bg-gray-200 !dark:bg-gray-800 font-medium text-primary",
-                      "shadow-sm",
-                    ]
-                  )}
-                >
-                  <div className="flex items-center">
-                    <Briefcase
-                      className={cn(
-                        "h-4 w-4 mr-2",
-                        currentView === "projects" && "text-primary"
-                      )}
-                    />
-                    <span>Projects</span>
                   </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>

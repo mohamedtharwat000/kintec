@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import {
-  getAllContractors,
-  createContractor,
-} from "@/services/contractors/contractorService";
+  getAllCwos,
+  createCwo,
+} from "@/services/calloff_work_orders/CwoService";
 
 export async function GET() {
   try {
-    const contractors = await getAllContractors();
-    return NextResponse.json(contractors, { status: 200 });
+    const calloff_work_orders = await getAllCwos();
+    return NextResponse.json(calloff_work_orders, { status: 200 });
   } catch (error) {
-    console.error(error);
+    //console.error(error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -20,10 +20,9 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const newContractor = await createContractor(body);
-    return NextResponse.json(newContractor, { status: 201 });
-  } catch (error) {
-    console.error(error);
+    const newCwo = await createCwo(body);
+    return NextResponse.json(newCwo, { status: 201 });
+  } catch (error: any) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

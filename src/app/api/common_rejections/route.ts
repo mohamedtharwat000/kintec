@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import {
-  getAllContractors,
-  createContractor,
-} from "@/services/contractors/contractorService";
+  getAllCommonRejections,
+  createCommonRejection,
+} from "@/services/common_rejections/commonRejectionService";
 
 export async function GET() {
   try {
-    const contractors = await getAllContractors();
-    return NextResponse.json(contractors, { status: 200 });
+    const rejections = await getAllCommonRejections();
+    return NextResponse.json(rejections, { status: 200 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -20,8 +20,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const newContractor = await createContractor(body);
-    return NextResponse.json(newContractor, { status: 201 });
+    const newRejection = await createCommonRejection(body);
+    return NextResponse.json(newRejection, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(

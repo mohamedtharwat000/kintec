@@ -1,25 +1,27 @@
 import { NextResponse } from "next/server";
 import {
-  getContractById,
-  updateContract,
-  deleteContract,
-} from "@/services/contracts/contractService";
+  getSubmissionValidationRuleById,
+  updateSubmissionValidationRule,
+  deleteSubmissionValidationRule,
+} from "@/services/submission_validation_rules/submissionValidationRuleService";
 
 export async function GET(
   request: Request,
-  context: { params: { contract_id: string } }
+  context: { params: { sub_val_rule_id: string } }
 ) {
   try {
     const params = await context.params;
 
-    const contract = await getContractById(params.contract_id);
-    if (!contract) {
+    const sub_val_rule = await getSubmissionValidationRuleById(
+      params.sub_val_rule_id
+    );
+    if (!sub_val_rule) {
       return NextResponse.json(
-        { error: "Contract not found" },
+        { error: "Submission validation rule not found" },
         { status: 404 }
       );
     }
-    return NextResponse.json(contract, { status: 200 });
+    return NextResponse.json(sub_val_rule, { status: 200 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -31,14 +33,17 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  context: { params: { contract_id: string } }
+  context: { params: { sub_val_rule_id: string } }
 ) {
   try {
     const params = await context.params;
     //console.log("here1");
     const body = await request.json();
     //console.log("here2");
-    const updated = await updateContract(params.contract_id, body);
+    const updated = await updateSubmissionValidationRule(
+      params.sub_val_rule_id,
+      body
+    );
     //console.log("here3");
     return NextResponse.json(updated, { status: 200 });
   } catch (error: any) {
@@ -53,11 +58,11 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  context: { params: { contract_id: string } }
+  context: { params: { sub_val_rule_id: string } }
 ) {
   try {
     const params = await context.params;
-    await deleteContract(params.contract_id);
+    await deleteSubmissionValidationRule(params.sub_val_rule_id);
     // 204 responses typically have no body.
     return new NextResponse(null, { status: 204 });
   } catch (error) {
