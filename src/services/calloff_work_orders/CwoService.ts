@@ -49,6 +49,39 @@ export const createCwo = async (data: {
   });
 };
 
+export const createCwos = async (
+  data: Array<{
+    CWO_start_date: string;
+    CWO_end_date: string;
+    contract_id: string;
+    CWO_total_value: Decimal;
+    CWO_status: PO_status;
+    kintec_email_for_remittance: string;
+  }>
+) => {
+  return prisma.$transaction(async (prisma) => {
+    const cwos = [];
+
+    for (const cwoData of data) {
+      const cwo = await prisma.calloff_work_order.create({
+        data: {
+          CWO_start_date: new Date(cwoData.CWO_start_date),
+          CWO_end_date: new Date(cwoData.CWO_end_date),
+          contract: { connect: { contract_id: cwoData.contract_id } },
+          CWO_total_value: cwoData.CWO_total_value,
+          CWO_status: cwoData.CWO_status,
+          kintec_email_for_remittance: cwoData.kintec_email_for_remittance,
+        },
+      });
+
+      cwos.push(cwo);
+    }
+
+    return cwos;
+  });
+};
+
+
 export const updateCwo = async (id: string, data: any) => {
   const { CWO_start_date, CWO_end_date, contract_id, ...rest } = data;
 
