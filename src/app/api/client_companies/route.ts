@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getAllClientCompanies,
-  createClientCompany,
+  createClientCompanies,
 } from "@/services/client_companies/clientCompanyService";
 
 export async function GET() {
@@ -20,7 +20,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const newClientCompany = await createClientCompany(body);
+    const newClientCompany = await createClientCompanies(body);
     return NextResponse.json(newClientCompany, { status: 201 });
   } catch (error: any) {
     // Unique contact email per company
