@@ -49,6 +49,39 @@ export const createPo = async (data: {
   });
 };
 
+export const createPos = async (
+  data: Array<{
+    PO_start_date: string;
+    PO_end_date: string;
+    contract_id: string;
+    PO_total_value: Decimal;
+    PO_status: PO_status;
+    kintec_email_for_remittance: string;
+  }>
+) => {
+  return prisma.$transaction(async (prisma) => {
+    const purchaseOrders = [];
+
+    for (const poData of data) {
+      const purchaseOrder = await prisma.purchase_order.create({
+        data: {
+          PO_start_date: new Date(poData.PO_start_date),
+          PO_end_date: new Date(poData.PO_end_date),
+          contract: { connect: { contract_id: poData.contract_id } },
+          PO_total_value: poData.PO_total_value,
+          PO_status: poData.PO_status,
+          kintec_email_for_remittance: poData.kintec_email_for_remittance,
+        },
+      });
+
+      purchaseOrders.push(purchaseOrder);
+    }
+
+    return purchaseOrders;
+  });
+};
+
+
 export const updatePo = async (id: string, data: any) => {
   const { PO_start_date, PO_end_date, contract_id, ...rest } = data;
 
