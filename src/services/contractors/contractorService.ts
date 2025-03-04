@@ -7,7 +7,7 @@ export const getAllContractors = async () => {
 export const getContractorById = async (id: string) => {
   return prisma.contractor.findUnique({
     where: { contractor_id: id },
-    include: { bank_details: true, visa_details: true },
+    include: { bank_details: true, visa_details: true , contracts: true, submissions: true},
   });
 };
 
