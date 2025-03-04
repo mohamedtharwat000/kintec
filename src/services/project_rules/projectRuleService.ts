@@ -36,6 +36,37 @@ export const createProjectRule = async (data: {
   });
 };
 
+export const createProjectRules = async (
+  data: Array<{
+    project_id: string;
+    special_project_rules: string;
+    project_rules_reviewer_name: string;
+    additional_review_process: additional_review_process;
+    major_project_indicator: boolean;
+  }>
+) => {
+  return prisma.$transaction(async (prisma) => {
+    const projectRules = [];
+
+    for (const ruleData of data) {
+      const projectRule = await prisma.project_rule.create({
+        data: {
+          project: { connect: { project_id: ruleData.project_id } },
+          special_project_rules: ruleData.special_project_rules,
+          project_rules_reviewer_name: ruleData.project_rules_reviewer_name,
+          additional_review_process: ruleData.additional_review_process,
+          major_project_indicator: ruleData.major_project_indicator,
+        },
+      });
+
+      projectRules.push(projectRule);
+    }
+
+    return projectRules;
+  });
+};
+
+
 export const updateProjectRule = async (id: string, data: any) => {
   const { project_id, ...rest } = data;
 
