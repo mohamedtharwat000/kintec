@@ -71,6 +71,51 @@ export const createRate = async (data: {
   });
 };
 
+export const createRates = async (
+  data: Array<{
+    PO_id?: string;
+    CWO_id?: string;
+    rate_type: rate_type;
+    rate_frequency: rate_frequency;
+    rate_value: number;
+    rate_currency: string;
+  }>
+) => {
+  return prisma.$transaction(async (prisma) => {
+    const rates = [];
+
+    for (const rateData of data) {
+      // Ensure that exactly one of PO_id or CWO_id is provided.
+      if (
+        (!rateData.PO_id && !rateData.CWO_id) ||
+        (rateData.PO_id && rateData.CWO_id)
+      ) {
+        throw new Error("Exactly one of PO_id or CWO_id must be provided.");
+      }
+
+      const rate = await prisma.rate.create({
+        data: {
+          rate_type: rateData.rate_type,
+          rate_frequency: rateData.rate_frequency,
+          rate_value: rateData.rate_value,
+          rate_currency: rateData.rate_currency,
+          ...(rateData.PO_id
+            ? { purchase_order: { connect: { PO_id: rateData.PO_id } } }
+            : {}),
+          ...(rateData.CWO_id
+            ? { calloff_work_order: { connect: { CWO_id: rateData.CWO_id } } }
+            : {}),
+        },
+      });
+
+      rates.push(rate);
+    }
+
+    return rates;
+  });
+};
+
+
 export const updateRate = async (
   id: string,
   data: {
