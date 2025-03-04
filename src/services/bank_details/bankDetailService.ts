@@ -43,6 +43,43 @@ export const createBankDetail = async (data: {
   });
 };
 
+export const createBankDetails = async (
+  data: Array<{
+    contractor_id: string;
+    bank_name: string;
+    account_number: string;
+    IBAN: string;
+    SWIFT: string;
+    currency: string;
+    bank_detail_type: bank_detail_type;
+    bank_detail_validated?: boolean;
+  }>
+) => {
+  return prisma.$transaction(async (prisma) => {
+    const bankDetails = [];
+
+    for (const bankData of data) {
+      const bankDetail = await prisma.bank_detail.create({
+        data: {
+          contractor: { connect: { contractor_id: bankData.contractor_id } },
+          bank_name: bankData.bank_name,
+          account_number: bankData.account_number,
+          IBAN: bankData.IBAN,
+          SWIFT: bankData.SWIFT,
+          currency: bankData.currency,
+          bank_detail_type: bankData.bank_detail_type as bank_detail_type,
+          bank_detail_validated: bankData.bank_detail_validated,
+          last_updated: new Date(),
+        },
+      });
+
+      bankDetails.push(bankDetail);
+    }
+
+    return bankDetails;
+  });
+};
+
 export const updateBankDetail = async (id: string, data: any) => {
   return prisma.bank_detail.update({
     where: { bank_detail_id: id },
