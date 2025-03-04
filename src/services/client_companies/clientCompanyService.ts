@@ -10,15 +10,27 @@ export const getClientCompanyById = async (id: string) => {
   });
 };
 
-export const createClientCompany = async (data: {
-  client_name: string;
-  contact_email: string;
-  invoice_submission_deadline?: string;
-}) => {
-  return prisma.client_company.create({
-    data: {
-      ...data,
-    },
+export const createClientCompany = async (
+  data: Array<{
+    client_name: string;
+    contact_email: string;
+    invoice_submission_deadline?: string;
+  }>
+) => {
+  return prisma.$transaction(async (prisma) => {
+    const companies = [];
+
+    for (const companyData of data) {
+      const company = await prisma.client_company.create({
+        data: {
+          ...companyData,
+        },
+      });
+
+      companies.push(company);
+    }
+
+    return companies;
   });
 };
 
