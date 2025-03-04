@@ -22,7 +22,26 @@ export const getContractorById = async (id: string) => {
   });
 };
 
-export const createContractor = async (
+export const createContractor = async (data: {
+  first_name: string;
+  middle_name?: string;
+  last_name: string;
+  date_of_birth: string;
+  email_address: string;
+  phone_number: string;
+  nationality: string;
+  address: string;
+  country_of_residence: string;
+}) => {
+  return prisma.contractor.create({
+    data: {
+      ...data,
+      date_of_birth: new Date(data.date_of_birth),
+    },
+  });
+};
+
+export const createContractors = async (
   data: Array<{
     first_name: string;
     middle_name?: string;
