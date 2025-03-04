@@ -84,6 +84,59 @@ export const createSubmission = async (data: {
   });
 };
 
+export const createSubmissions = async (
+  data: Array<{
+    contractor_id: string;
+    PO_id?: string;
+    CWO_id?: string;
+    billing_period: string;
+    payment_currency: string;
+    invoice_currency: string;
+    invoice_due_date: string;
+    wht_rate?: number;
+    wht_applicable?: boolean;
+    external_assignment?: boolean;
+  }>
+) => {
+  return prisma.$transaction(async (prisma) => {
+    const submissions = [];
+
+    for (const submissionData of data) {
+      // Ensure that exactly one of PO_id or CWO_id is provided.
+      if (
+        (!submissionData.PO_id && !submissionData.CWO_id) ||
+        (submissionData.PO_id && submissionData.CWO_id)
+      ) {
+        throw new Error("Exactly one of PO_id or CWO_id must be provided.");
+      }
+
+      const submission = await prisma.submission.create({
+        data: {
+          contractor: { connect: { contractor_id: submissionData.contractor_id } },
+          billing_period: new Date(submissionData.billing_period),
+          payment_currency: submissionData.payment_currency,
+          invoice_currency: submissionData.invoice_currency,
+          invoice_due_date: new Date(submissionData.invoice_due_date),
+          wht_rate: submissionData.wht_rate,
+          wht_applicable: submissionData.wht_applicable,
+          external_assignment: submissionData.external_assignment,
+          ...(submissionData.PO_id
+            ? { purchase_order: { connect: { PO_id: submissionData.PO_id } } }
+            : {}),
+          ...(submissionData.CWO_id
+            ? { calloff_work_order: { connect: { CWO_id: submissionData.CWO_id } } }
+            : {}),
+        },
+      });
+
+      submissions.push(submission);
+    }
+
+    return submissions;
+  });
+};
+
+
 export const updateSubmission = async (
   id: string,
   data: {
