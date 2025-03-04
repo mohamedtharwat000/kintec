@@ -10,7 +10,19 @@ export const getClientCompanyById = async (id: string) => {
   });
 };
 
-export const createClientCompany = async (
+export const createClientCompany = async (data: {
+  client_name: string;
+  contact_email: string;
+  invoice_submission_deadline?: string;
+}) => {
+  return prisma.client_company.create({
+    data: {
+      ...data,
+    },
+  });
+};
+
+export const createClientCompanies = async (
   data: Array<{
     client_name: string;
     contact_email: string;
