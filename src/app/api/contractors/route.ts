@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getAllContractors,
-  createContractor,
+  createContractors,
 } from "@/services/contractors/contractorService";
 
 export async function GET() {
@@ -20,7 +20,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const newContractor = await createContractor(body);
+    const newContractor = await createContractors(body);
     return NextResponse.json(newContractor, { status: 201 });
   } catch (error) {
     console.error(error);
