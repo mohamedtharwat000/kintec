@@ -27,10 +27,9 @@ export function App() {
   return (
     <div className="flex flex-col h-screen [--header-height:calc(theme(spacing.14))]">
       <SiteHeader showUserNav={isAuthenticated} />
-      <div className="flex-1">
-        {/* {!isAuthenticated ? (
-          <AppLogin />
-        ) : ( */}
+      {!isAuthenticated ? (
+        <AppLogin />
+      ) : (
         <div className="flex flex-1 overflow-hidden">
           <AppSidebar
             currentView={currentView}
@@ -45,8 +44,7 @@ export function App() {
             </div>
           </SidebarInset>
         </div>
-        {/* )} */}
-      </div>
+      )}
       <Toaster
         richColors
         closeButton
