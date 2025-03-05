@@ -20,10 +20,12 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const newClientCompany = await createClientCompanies(body);
-    return NextResponse.json(newClientCompany, { status: 201 });
+    const companiesData = Array.isArray(body) ? body : [body];
+
+    const newClientCompanies = await createClientCompanies(companiesData);
+
+    return NextResponse.json(newClientCompanies, { status: 201 });
   } catch (error: any) {
-    // Unique contact email per company
     if (error instanceof Error && "code" in error && error.code === "P2002") {
       return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
     }

@@ -7,7 +7,14 @@ import {
 } from "@prisma/client";
 
 export const getAllContractors = async () => {
-  return prisma.contractor.findMany();
+  return prisma.contractor.findMany({
+    include: {
+      bank_details: true,
+      visa_details: true,
+      contracts: true,
+      submissions: true,
+    },
+  });
 };
 
 export const getContractorById = async (id: string) => {
@@ -38,6 +45,19 @@ export const createContractor = async (data: {
       ...data,
       date_of_birth: new Date(data.date_of_birth),
     },
+  });
+};
+
+export const updateContractor = async (id: string, data: any) => {
+  return prisma.contractor.update({
+    where: { contractor_id: id },
+    data,
+  });
+};
+
+export const deleteContractor = async (id: string) => {
+  return prisma.contractor.delete({
+    where: { contractor_id: id },
   });
 };
 
@@ -121,15 +141,80 @@ export const createContractors = async (
   });
 };
 
-export const updateContractor = async (id: string, data: any) => {
-  return prisma.contractor.update({
-    where: { contractor_id: id },
-    data,
-  });
-};
+export const updateContractors = async (
+  data: Array<{
+    contractor_id: string;
+    first_name?: string;
+    middle_name?: string;
+    last_name?: string;
+    date_of_birth?: string;
+    email_address?: string;
+    phone_number?: string;
+    nationality?: string;
+    address?: string;
+    country_of_residence?: string;
+    bank_details?: {
+      bank_name: string;
+      account_number: string;
+      IBAN: string;
+      SWIFT: string;
+      currency: string;
+      bank_detail_type: bank_detail_type;
+      bank_detail_validated?: boolean;
+    };
+    visa_details?: {
+      visa_number: string;
+      visa_type: string;
+      visa_country: string;
+      visa_expiry_date: string;
+      visa_status: visa_status;
+      visa_sponsor: string;
+      country_id_number: string;
+      country_id_type: country_id_type;
+      country_id_expiry_date: string;
+      country_id_status: country_id_status;
+    };
+  }>
+) => {
+  return prisma.$transaction(async (prisma) => {
+    const updatedContractors = [];
+    for (const contractorData of data) {
+      const { bank_details, visa_details, contractor_id, ...contractorInfo } =
+        contractorData;
+      const updated = await prisma.contractor.update({
+        where: { contractor_id },
+        data: {
+          ...contractorInfo,
+          date_of_birth: contractorInfo.date_of_birth
+            ? new Date(contractorInfo.date_of_birth)
+            : undefined,
+        },
+      });
 
-export const deleteContractor = async (id: string) => {
-  return prisma.contractor.delete({
-    where: { contractor_id: id },
+      if (bank_details) {
+        await prisma.bank_detail.updateMany({
+          where: { contractor_id },
+          data: {
+            ...bank_details,
+            last_updated: new Date(),
+          },
+        });
+      }
+      if (visa_details) {
+        await prisma.visa_detail.updateMany({
+          where: { contractor_id },
+          data: {
+            ...visa_details,
+            visa_expiry_date: new Date(visa_details.visa_expiry_date),
+            country_id_expiry_date: new Date(
+              visa_details.country_id_expiry_date
+            ),
+          },
+        });
+      }
+
+      updatedContractors.push(updated);
+    }
+    return updatedContractors;
   });
 };

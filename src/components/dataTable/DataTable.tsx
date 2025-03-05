@@ -104,14 +104,12 @@ export function DataTable<TData>({
         </Table>
       </div>
 
-      {manualPagination && (
-        <DataTablePagination
-          table={table}
-          dataLength={data.length}
-          isLoading={loading}
-          manualPagination={manualPagination}
-        />
-      )}
+      <DataTablePagination
+        table={table}
+        dataLength={data.length}
+        isLoading={loading}
+        manualPagination={manualPagination}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Contract } from "@/types/contract";
+import { Contract } from "@/types/Contract";
 
 export interface Project {
   project_id: string;

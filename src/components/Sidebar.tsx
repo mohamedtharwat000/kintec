@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Building2, Users, FileText, Briefcase } from "lucide-react";
+import { Building2, Users, FileText } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -15,8 +15,8 @@ import {
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
-  currentView: "contractors" | "companies" | "contracts";
-  onNavigation: (view: "contractors" | "companies" | "contracts") => void;
+  currentView: "contractors" | "companies";
+  onNavigation: (view: "contractors" | "companies") => void;
 }
 
 export function AppSidebar({ currentView, onNavigation }: SidebarProps) {
@@ -73,31 +73,6 @@ export function AppSidebar({ currentView, onNavigation }: SidebarProps) {
                       )}
                     />
                     <span>Companies</span>
-                  </div>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={currentView === "contracts"}
-                  onClick={() => onNavigation("contracts")}
-                  className={cn(
-                    "cursor-pointer transition-all relative",
-                    "hover:bg-gray-100 dark:hover:bg-gray-800/40",
-                    currentView === "contracts" && [
-                      "bg-gray-200 dark:bg-gray-800 font-medium text-primary",
-                    ]
-                  )}
-                >
-                  <div className="flex items-center">
-                    <FileText
-                      className={cn(
-                        "h-4 w-4 mr-2",
-                        currentView === "contracts" && "text-primary"
-                      )}
-                    />
-                    <span>Contracts</span>
                   </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>

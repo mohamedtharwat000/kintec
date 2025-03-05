@@ -1,12 +1,19 @@
 import { prisma } from "@/lib/prisma";
 
 export const getAllClientCompanies = async () => {
-  return prisma.client_company.findMany();
+  return prisma.client_company.findMany({
+    include: {
+      contracts: true,
+    },
+  });
 };
 
 export const getClientCompanyById = async (id: string) => {
   return prisma.client_company.findUnique({
     where: { client_company_id: id },
+    include: {
+      contracts: true,
+    },
   });
 };
 
@@ -19,6 +26,19 @@ export const createClientCompany = async (data: {
     data: {
       ...data,
     },
+  });
+};
+
+export const updateClientCompany = async (id: string, data: any) => {
+  return prisma.client_company.update({
+    where: { client_company_id: id },
+    data,
+  });
+};
+
+export const deleteClientCompany = async (id: string) => {
+  return prisma.client_company.delete({
+    where: { client_company_id: id },
   });
 };
 
@@ -43,18 +63,5 @@ export const createClientCompanies = async (
     }
 
     return companies;
-  });
-};
-
-export const updateClientCompany = async (id: string, data: any) => {
-  return prisma.client_company.update({
-    where: { client_company_id: id },
-    data,
-  });
-};
-
-export const deleteClientCompany = async (id: string) => {
-  return prisma.client_company.delete({
-    where: { client_company_id: id },
   });
 };

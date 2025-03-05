@@ -26,7 +26,13 @@ export const DataTablePagination = <TData,>({
   dataLength,
   manualPagination,
 }: DataTablePaginationProps<TData>) => {
-  if (!manualPagination || isError || isLoading || dataLength === 0) {
+  // Don't render if there's no data, an error, or loading
+  if (isError || isLoading || dataLength === 0) {
+    return null;
+  }
+
+  // Don't render pagination if we have fewer rows than page size
+  if (dataLength <= table.getState().pagination.pageSize) {
     return null;
   }
 
@@ -80,9 +86,12 @@ export const DataTablePagination = <TData,>({
 
             {table.getState().pagination.pageIndex <
               table.getPageCount() - 2 && (
-              <PaginationItem>
-                <div className="px-4">...</div>
-              </PaginationItem>
+              <>
+                <PaginationItem />
+                <PaginationItem>
+                  <div className="px-4">...</div>
+                </PaginationItem>
+              </>
             )}
           </>
         )}

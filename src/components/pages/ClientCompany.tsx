@@ -1,16 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useClients, useDeleteClient } from "@/hooks/useApp";
-import { DataTable } from "@/components/dataTable/Table";
+import { useClients, useDeleteClient, useCreateClient } from "@/hooks/useApp";
+import { DataTable } from "@/components/dataTable/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, Pencil, Trash2, AlertCircle } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Upload } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { DetailDialog } from "@/components/ui/DetailDialog";
 import { ClientForm } from "@/components/forms/ClientCompany";
 import type { ClientCompany as ClientCompanyType } from "@/types/ClientCompany";
 import { toast } from "sonner";
+import { parseClientCompany } from "@/lib/csv";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,25 +21,36 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ClientCompanyDetails } from "@/components/detailsDialogs/ClientCompany";
+import { CSVPreviewDialog } from "@/components/csvPreviewDialog/ClientCompany";
 
 export function ClientCompany() {
   const { data: clients = [], isLoading } = useClients();
   const deleteClient = useDeleteClient();
+  const createClient = useCreateClient();
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [formMode, setFormMode] = useState<"none" | "add" | "edit">("none");
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
 
+  // CSV upload state
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [csvData, setCsvData] = useState<Partial<ClientCompanyType>[]>([]);
+  const [csvFileName, setCsvFileName] = useState("");
+  const [validationErrors, setValidationErrors] = useState<
+    { row: number; error: string }[]
+  >([]);
+
   const handleAddClick = () => {
     setSelectedClientId(null);
-    setFormMode("add");
+    setIsFormDialogOpen(true);
   };
 
   const handleEditClick = (clientId: string) => {
     setSelectedClientId(clientId);
-    setFormMode("edit");
+    setIsFormDialogOpen(true);
   };
 
   const handleDeleteClick = (clientId: string) => {
@@ -47,12 +58,12 @@ export function ClientCompany() {
     setDeleteDialogOpen(true);
   };
 
-  const handleCancelForm = () => {
-    setFormMode("none");
+  const handleFormClose = () => {
+    setIsFormDialogOpen(false);
   };
 
   const handleFormSuccess = () => {
-    setFormMode("none");
+    // The form itself will close the dialog
   };
 
   const handleConfirmDelete = async () => {
@@ -69,26 +80,70 @@ export function ClientCompany() {
     }
   };
 
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const result = await parseClientCompany(file);
+      setCsvFileName(file.name);
+      setCsvData(result.data);
+
+      // Show preview dialog
+      setIsPreviewOpen(true);
+    } catch (error) {
+      console.error("Error parsing CSV:", error);
+      toast.error("Failed to parse CSV file");
+    } finally {
+      // Reset the file input
+      event.target.value = "";
+    }
+  };
+
+  // Handle CSV data import confirmation
+  const handleConfirmCsvUpload = async () => {
+    try {
+      // Submit all CSV data as an array to the API
+      await createClient.mutateAsync(csvData);
+      toast.success(`Successfully imported ${csvData.length} companies`);
+      return Promise.resolve();
+    } catch (error) {
+      console.error("Error importing CSV data:", error);
+      toast.error("Failed to import companies from CSV");
+      return Promise.reject(error);
+    }
+  };
+
   const columns: ColumnDef<ClientCompanyType>[] = [
     {
       accessorKey: "client_company_id",
       header: "ID",
+      cell: ({ row }) => (
+        <div className="font-mono text-xs w-32">
+          {row.getValue("client_company_id")}
+        </div>
+      ),
     },
     {
       accessorKey: "client_name",
       header: "Name",
+      cell: ({ row }) => (
+        <div className="font-medium w-32">{row.getValue("client_name")}</div>
+      ),
     },
     {
       accessorKey: "contact_email",
       header: "Email",
-    },
-    {
-      accessorKey: "invoice_submission_deadline",
-      header: "Invoice Deadline",
-      cell: ({ row }) => {
-        const deadline = row.original.invoice_submission_deadline;
-        return deadline ? deadline : "N/A";
-      },
+      cell: ({ row }) => (
+        <a
+          href={`mailto:${row.getValue("contact_email")}`}
+          className="text-blue-600 hover:underline w-32"
+        >
+          {row.getValue("contact_email")}
+        </a>
+      ),
     },
     {
       id: "actions",
@@ -109,7 +164,7 @@ export function ClientCompany() {
           >
             <Trash2 className="h-4 w-4 text-red-500" />
           </Button>
-          <DetailDialog data={row.original} title="Company Details" />
+          <ClientCompanyDetails company={row.original} />
         </div>
       ),
     },
@@ -122,27 +177,32 @@ export function ClientCompany() {
       company.client_company_id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Show form if in add or edit mode
-  if (formMode === "add" || formMode === "edit") {
-    return (
-      <ClientForm
-        clientId={
-          formMode === "edit" ? selectedClientId || undefined : undefined
-        }
-        onCancel={handleCancelForm}
-        onSuccess={handleFormSuccess}
-      />
-    );
-  }
-
   return (
     <div className="p-8">
       <div className="mb-8 flex justify-between items-center">
         <h1 className="text-2xl font-semibold">Company Master Data</h1>
-        <Button onClick={handleAddClick}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Company
-        </Button>
+        <div className="flex gap-2">
+          <div className="relative">
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="csv-upload"
+            />
+            <Button
+              variant="outline"
+              onClick={() => document.getElementById("csv-upload")?.click()}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Upload CSV
+            </Button>
+          </div>
+          <Button onClick={handleAddClick}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Company
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6 flex gap-4">
@@ -164,6 +224,15 @@ export function ClientCompany() {
         pageSize={10}
       />
 
+      {/* Add/Edit Form Dialog */}
+      <ClientForm
+        clientId={selectedClientId || undefined}
+        open={isFormDialogOpen}
+        onClose={handleFormClose}
+        onSuccess={handleFormSuccess}
+      />
+
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -184,6 +253,16 @@ export function ClientCompany() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* CSV Preview Dialog */}
+      <CSVPreviewDialog
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        data={csvData}
+        fileName={csvFileName}
+        onConfirm={handleConfirmCsvUpload}
+        validationErrors={validationErrors}
+      />
     </div>
   );
 }

@@ -20,10 +20,21 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const newContractor = await createContractors(body);
-    return NextResponse.json(newContractor, { status: 201 });
-  } catch (error) {
+    const contractorsData = Array.isArray(body) ? body : [body];
+
+    const newContractors = await createContractors(contractorsData);
+
+    return NextResponse.json(newContractors, { status: 201 });
+  } catch (error: any) {
     console.error(error);
+
+    if (error?.code === "P2002") {
+      return NextResponse.json(
+        { error: "Duplicate contractor ID" },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

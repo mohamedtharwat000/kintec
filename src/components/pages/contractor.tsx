@@ -1,16 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { useContractors, useDeleteContractor } from "@/hooks/useApp";
-import { DataTable } from "@/components/dataTable/Table";
+import {
+  useContractors,
+  useDeleteContractor,
+  useCreateContractor,
+} from "@/hooks/useApp";
+import { DataTable } from "@/components/dataTable/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Upload } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { DetailDialog } from "@/components/ui/DetailDialog";
-import { ContractorForm } from "@/components/forms/ContractorForm";
+import { ContractorForm } from "@/components/forms/Contractor";
 import { toast } from "sonner";
-import type { Contractor as ContractorType } from "@/types/contractor";
+import type { Contractor as ContractorType } from "@/types/Contractor";
+import { parseContractor } from "@/lib/csv";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,13 +25,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ContractorDetails } from "@/components/detailsDialogs/Contractor";
+import { CSVPreviewDialog } from "@/components/csvPreviewDialog/Contractor";
 
 export function Contractor() {
   const { data: contractors = [], isLoading } = useContractors();
   const deleteContractor = useDeleteContractor();
+  const createContractor = useCreateContractor();
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [formMode, setFormMode] = useState<"none" | "add" | "edit">("none");
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [selectedContractorId, setSelectedContractorId] = useState<
     string | null
   >(null);
@@ -36,14 +43,25 @@ export function Contractor() {
     null
   );
 
+  // CSV upload state
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [csvData, setCsvData] = useState<Partial<ContractorType>[]>([]);
+  const [csvDataToUpload, setCsvDataToUpload] = useState<
+    Partial<ContractorType>[]
+  >([]);
+  const [csvFileName, setCsvFileName] = useState("");
+  const [validationErrors, setValidationErrors] = useState<
+    { row: number; error: string }[]
+  >([]);
+
   const handleAddClick = () => {
     setSelectedContractorId(null);
-    setFormMode("add");
+    setIsFormDialogOpen(true);
   };
 
   const handleEditClick = (contractorId: string) => {
     setSelectedContractorId(contractorId);
-    setFormMode("edit");
+    setIsFormDialogOpen(true);
   };
 
   const handleDeleteClick = (contractorId: string) => {
@@ -51,12 +69,12 @@ export function Contractor() {
     setDeleteDialogOpen(true);
   };
 
-  const handleCancelForm = () => {
-    setFormMode("none");
+  const handleFormClose = () => {
+    setIsFormDialogOpen(false);
   };
 
   const handleFormSuccess = () => {
-    setFormMode("none");
+    // The form itself will handle success actions
   };
 
   const handleConfirmDelete = async () => {
@@ -73,26 +91,79 @@ export function Contractor() {
     }
   };
 
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const result = await parseContractor(file);
+      setCsvFileName(file.name);
+      setCsvData(result.data);
+      setCsvDataToUpload(
+        (result.dataToUpload as Partial<ContractorType>[]) || []
+      );
+
+      // Show preview dialog
+      setIsPreviewOpen(true);
+    } catch (error) {
+      console.error("Error parsing CSV:", error);
+      toast.error("Failed to parse CSV file");
+    } finally {
+      // Reset the file input
+      event.target.value = "";
+    }
+  };
+
+  // Handle CSV data import confirmation
+  const handleConfirmCsvUpload = async () => {
+    try {
+      // Submit all CSV data as an array to the API
+      await createContractor.mutateAsync(csvDataToUpload);
+      toast.success(
+        `Successfully imported ${csvDataToUpload.length} contractors`
+      );
+      setCsvData([]);
+      setCsvDataToUpload([]);
+      setCsvFileName("");
+    } catch (error) {
+      console.error("Error importing CSV data:", error);
+      toast.error("Failed to import contractors from CSV");
+      return Promise.reject(error);
+    }
+  };
+
   const columns: ColumnDef<ContractorType>[] = [
     {
       accessorKey: "contractor_id",
       header: "ID",
+      cell: ({ row }) => (
+        <div className="font-mono text-xs w-32">
+          {row.getValue("contractor_id")}
+        </div>
+      ),
     },
     {
       accessorFn: (row) => `${row.first_name} ${row.last_name}`,
       header: "Name",
+      cell: ({ row }) => (
+        <div className="font-medium w-32">
+          {`${row.original.first_name} ${row.original.last_name}`}
+        </div>
+      ),
     },
     {
       accessorKey: "email_address",
       header: "Email",
-    },
-    {
-      accessorKey: "phone_number",
-      header: "Phone",
-    },
-    {
-      accessorKey: "nationality",
-      header: "Nationality",
+      cell: ({ row }) => (
+        <a
+          href={`mailto:${row.getValue("email_address")}`}
+          className="text-blue-600 hover:underline w-32"
+        >
+          {row.getValue("email_address")}
+        </a>
+      ),
     },
     {
       id: "actions",
@@ -113,16 +184,7 @@ export function Contractor() {
           >
             <Trash2 className="h-4 w-4 text-red-500" />
           </Button>
-          <DetailDialog
-            data={row.original}
-            title="Contractor Details"
-            excludeFields={[
-              "contracts",
-              "submissions",
-              "bank_details",
-              "visa_details",
-            ]}
-          />
+          <ContractorDetails contractor={row.original} />
         </div>
       ),
     },
@@ -141,27 +203,32 @@ export function Contractor() {
       contractor.phone_number.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Show form if in add or edit mode
-  if (formMode === "add" || formMode === "edit") {
-    return (
-      <ContractorForm
-        contractorId={
-          formMode === "edit" ? selectedContractorId || undefined : undefined
-        }
-        onCancel={handleCancelForm}
-        onSuccess={handleFormSuccess}
-      />
-    );
-  }
-
   return (
     <div className="p-8">
       <div className="mb-8 flex justify-between items-center">
         <h1 className="text-2xl font-semibold">Contractor Master Data</h1>
-        <Button onClick={handleAddClick}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Contractor
-        </Button>
+        <div className="flex gap-2">
+          <div className="relative">
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="csv-upload"
+            />
+            <Button
+              variant="outline"
+              onClick={() => document.getElementById("csv-upload")?.click()}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Upload CSV
+            </Button>
+          </div>
+          <Button onClick={handleAddClick}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Contractor
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6 flex gap-4">
@@ -183,6 +250,7 @@ export function Contractor() {
         pageSize={10}
       />
 
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -203,6 +271,24 @@ export function Contractor() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add/Edit Form Dialog */}
+      <ContractorForm
+        contractorId={selectedContractorId || undefined}
+        open={isFormDialogOpen}
+        onClose={handleFormClose}
+        onSuccess={handleFormSuccess}
+      />
+
+      {/* CSV Preview Dialog */}
+      <CSVPreviewDialog
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        data={csvData}
+        fileName={csvFileName}
+        onConfirm={handleConfirmCsvUpload}
+        validationErrors={validationErrors}
+      />
     </div>
   );
 }

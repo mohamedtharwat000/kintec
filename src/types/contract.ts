@@ -1,5 +1,5 @@
 import { ClientCompany } from "@/types/ClientCompany";
-import { Contractor } from "@/types/contractor";
+import { Contractor } from "@/types/Contractor";
 import { Project } from "@/types/Project";
 
 export interface Contract {

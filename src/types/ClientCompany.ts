@@ -1,4 +1,4 @@
-import { Contract } from "@/types/contract";
+import { Contract } from "@/types/Contract";
 
 export interface ClientCompany {
   client_company_id: string;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getContractorById,
-  updateContractor,
+  updateContractors,
   deleteContractor,
 } from "@/services/contractors/contractorService";
 
@@ -36,8 +36,10 @@ export async function PUT(
   try {
     const params = await context.params;
     const body = await request.json();
-    const updated = await updateContractor(params.contractor_id, body);
-    return NextResponse.json(updated, { status: 200 });
+    const updated = await updateContractors([
+      { contractor_id: params.contractor_id, ...body },
+    ]);
+    return NextResponse.json(updated[0], { status: 200 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(

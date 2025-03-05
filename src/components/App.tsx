@@ -4,8 +4,7 @@ import { memo, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { AppSidebar } from "@/components/Sidebar";
 import { ClientCompany } from "@/components/pages/ClientCompany";
-import { Contractor } from "@/components/pages/contractor";
-import { Contract } from "@/components/pages/Contract";
+import { Contractor } from "@/components/pages/Contractor";
 import { SidebarInset, useSidebar } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/header/site-header";
 import { useAppStore } from "@/store/useAppStore";
@@ -13,13 +12,11 @@ import AppLogin from "@/components/Login";
 
 export function App() {
   const { isAuthenticated } = useAppStore();
-  const [currentView, setCurrentView] = useState<
-    "contractors" | "companies" | "contracts"
-  >("contractors");
+  const [currentView, setCurrentView] = useState<"contractors" | "companies">(
+    "contractors"
+  );
 
-  const handleNavigation = (
-    view: "contractors" | "companies" | "contracts"
-  ) => {
+  const handleNavigation = (view: "contractors" | "companies") => {
     setCurrentView(view);
     if (window.innerWidth < 768) {
       const { closeSidebar } = useSidebar();
@@ -44,7 +41,6 @@ export function App() {
               <div className="w-full">
                 {currentView === "contractors" && <Contractor />}
                 {currentView === "companies" && <ClientCompany />}
-                {currentView === "contracts" && <Contract />}
               </div>
             </div>
           </SidebarInset>

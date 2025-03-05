@@ -2,8 +2,8 @@ import axiosClient from "@/lib/axios";
 import { tryCatch } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ClientCompany } from "@/types/ClientCompany";
-import { Contractor } from "@/types/contractor";
-import { Contract } from "@/types/contract";
+import { Contractor } from "@/types/Contractor";
+import { Contract } from "@/types/Contract";
 import { Project } from "@/types/Project";
 
 // Client Companies
@@ -36,17 +36,23 @@ export function useCreateClient() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (newClient: Omit<ClientCompany, "id">) => {
+    mutationFn: async (
+      newClients: Partial<ClientCompany> | Partial<ClientCompany>[]
+    ) => {
+      const clientsArray = Array.isArray(newClients)
+        ? newClients
+        : [newClients];
+
       const result = await tryCatch(async () => {
-        const { data } = await axiosClient.post<ClientCompany>(
+        const { data } = await axiosClient.post<ClientCompany[]>(
           "/api/client_companies",
-          newClient
+          clientsArray
         );
         return data;
       });
 
       if (result.error) throw result.error;
-      return result.data!;
+      return Array.isArray(newClients) ? result.data! : result.data![0];
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
@@ -130,17 +136,25 @@ export function useCreateContractor() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (newContractor: Omit<Contractor, "id">) => {
+    mutationFn: async (
+      newContractors:
+        | Partial<Omit<Contractor, "contractor_id">>
+        | Partial<Contractor>[]
+    ) => {
+      const contractorsArray = Array.isArray(newContractors)
+        ? newContractors
+        : [newContractors];
+
       const result = await tryCatch(async () => {
-        const { data } = await axiosClient.post<Contractor>(
+        const { data } = await axiosClient.post<Contractor[]>(
           "/api/contractors",
-          newContractor
+          contractorsArray
         );
         return data;
       });
 
       if (result.error) throw result.error;
-      return result.data!;
+      return Array.isArray(newContractors) ? result.data! : result.data![0];
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contractors"] });
@@ -160,15 +174,14 @@ export function useUpdateContractor() {
       data: Partial<Contractor>;
     }) => {
       const result = await tryCatch(async () => {
-        const { data: updatedEmployee } = await axiosClient.put<Contractor>(
-          `/api/contractors/${id}`,
-          data
-        );
-        return updatedEmployee;
+        const { data: updatedContractors } = await axiosClient.put<
+          Contractor[]
+        >(`/api/contractors/${id}`, { contractor_id: id, ...data });
+        return updatedContractors;
       });
 
       if (result.error) throw result.error;
-      return result.data!;
+      return result.data![0];
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["contractors"] });
