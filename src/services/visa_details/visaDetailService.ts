@@ -52,6 +52,49 @@ export const createVisaDetail = async (data: {
   });
 };
 
+export const createVisaDetails = async (
+  data: Array<{
+    contractor_id: string;
+    visa_number: string;
+    visa_type: string;
+    visa_country: string;
+    visa_expiry_date: string;
+    visa_status: visa_status;
+    visa_sponsor: string;
+    country_id_number: string;
+    country_id_type: country_id_type;
+    country_id_expiry_date: string;
+    country_id_status: country_id_status;
+  }>
+) => {
+  return prisma.$transaction(async (prisma) => {
+    const visaDetails = [];
+
+    for (const visaData of data) {
+      const visaDetail = await prisma.visa_detail.create({
+        data: {
+          contractor: { connect: { contractor_id: visaData.contractor_id } },
+          visa_number: visaData.visa_number,
+          visa_type: visaData.visa_type,
+          visa_country: visaData.visa_country,
+          visa_expiry_date: new Date(visaData.visa_expiry_date),
+          visa_status: visaData.visa_status,
+          visa_sponsor: visaData.visa_sponsor,
+          country_id_number: visaData.country_id_number,
+          country_id_type: visaData.country_id_type,
+          country_id_expiry_date: new Date(visaData.country_id_expiry_date),
+          country_id_status: visaData.country_id_status,
+        },
+      });
+
+      visaDetails.push(visaDetail);
+    }
+
+    return visaDetails;
+  });
+};
+
+
 export const updateVisaDetail = async (id: string, data: any) => {
   return prisma.visa_detail.update({
     where: { visa_detail_id: id },
