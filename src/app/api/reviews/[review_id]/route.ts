@@ -10,8 +10,9 @@ export async function GET(
   context: { params: { review_id: string } }
 ) {
   try {
-    const { review_id } = context.params;
-    const review = await getReviewById(review_id);
+    const params = await context.params;
+
+    const review = await getReviewById(params.review_id);
     if (!review) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 });
     }
@@ -30,9 +31,9 @@ export async function PUT(
   context: { params: { review_id: string } }
 ) {
   try {
-    const { review_id } = context.params;
+    const params = await context.params;
     const body = await request.json();
-    const updated = await updateReview(review_id, body);
+    const updated = await updateReview(params.review_id, body);
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {
     console.error(error);
@@ -48,8 +49,8 @@ export async function DELETE(
   context: { params: { review_id: string } }
 ) {
   try {
-    const { review_id } = context.params;
-    await deleteReview(review_id);
+    const params = await context.params;
+    await deleteReview(params.review_id);
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error(error);

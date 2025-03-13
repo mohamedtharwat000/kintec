@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getContractorById,
-  updateContractors,
+  updateContractor,
   deleteContractor,
 } from "@/services/contractors/contractorService";
 
@@ -36,10 +36,8 @@ export async function PUT(
   try {
     const params = await context.params;
     const body = await request.json();
-    const updated = await updateContractors([
-      { contractor_id: params.contractor_id, ...body },
-    ]);
-    return NextResponse.json(updated[0], { status: 200 });
+    const updated = await updateContractor(params.contractor_id, body);
+    return NextResponse.json(updated, { status: 200 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -56,11 +54,9 @@ export async function DELETE(
   try {
     const params = await context.params;
     await deleteContractor(params.contractor_id);
-    // 204 responses typically have no body.
     return new NextResponse(null, { status: 204 });
-  } catch (error: any) {
-    console.error(error.code);
-    console.error(error.message);
+  } catch (error) {
+    console.error(error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getAllBankDetails,
-  createBankDetail,
+  createBankDetails,
 } from "@/services/bank_details/bankDetailService";
 
 export async function GET() {
@@ -20,10 +20,16 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const newBankDetail = await createBankDetail(body);
-    return NextResponse.json(newBankDetail, { status: 201 });
+    const bankDetailsData = Array.isArray(body) ? body : [body];
+
+    const newBankDetails = await createBankDetails(bankDetailsData);
+
+    return NextResponse.json(newBankDetails, { status: 201 });
   } catch (error: any) {
-    console.error(error);
+    if (error instanceof Error && "code" in error && error.code === "P2002") {
+      return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

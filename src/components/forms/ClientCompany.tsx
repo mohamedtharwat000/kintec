@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Save, X, Loader2 } from "lucide-react";
+import { Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,8 +14,11 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useClient, useCreateClient, useUpdateClient } from "@/hooks/useApp";
-import { ClientCompany } from "@/types/ClientCompany";
+import {
+  useClient,
+  useCreateClient,
+  useUpdateClient,
+} from "@/hooks/useClientCompany";
 import {
   Form,
   FormControl,
@@ -24,6 +27,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { tryCatch } from "@/lib/utils";
 
 const formSchema = z.object({
   client_name: z.string().min(1, "Company name is required"),
@@ -72,7 +76,6 @@ export function ClientForm({
           existingClient.invoice_submission_deadline || "",
       });
     } else if (!isEditing && open) {
-      // Reset form when opening in create mode
       form.reset({
         client_name: "",
         contact_email: "",
@@ -82,7 +85,7 @@ export function ClientForm({
   }, [existingClient, form, isEditing, open]);
 
   const onSubmit = async (data: FormData) => {
-    try {
+    const { error } = await tryCatch(async () => {
       if (isEditing) {
         await updateClient.mutateAsync({
           id: clientId,
@@ -106,7 +109,9 @@ export function ClientForm({
         onSuccess();
       }
       onClose();
-    } catch (error) {
+    });
+
+    if (error) {
       console.error(error);
       toast.error(
         isEditing ? "Failed to update company" : "Failed to create company"
@@ -117,8 +122,15 @@ export function ClientForm({
   const isSubmitting = createClient.isPending || updateClient.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!isSubmitting && !open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-[80vw] max-h-[80vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Company" : "Add New Company"}
@@ -203,11 +215,16 @@ export function ClientForm({
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {isEditing ? "Updating..." : "Saving..."}
+                    </>
                   ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isEditing ? "Update" : "Save"}
+                    </>
                   )}
-                  {isEditing ? "Update" : "Save"}
                 </Button>
               </DialogFooter>
             </form>

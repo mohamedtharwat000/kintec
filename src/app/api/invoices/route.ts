@@ -23,13 +23,9 @@ export async function POST(request: Request) {
     const newInvoice = await createInvoice(body);
     return NextResponse.json(newInvoice, { status: 201 });
   } catch (error: any) {
-    console.error(error.code);
-    //Contract does not point at a contractor, client_company or a project
-    //   if (error instanceof Error && "code" in error && error.code === "P2025") {
-    //       return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
-    //     }
+    console.error(error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: error.message || "Internal server error" },
       { status: 500 }
     );
   }

@@ -7,14 +7,14 @@ import {
 
 export async function GET(
   request: Request,
-  context: { params: { rate_id: string } }
+  context: { params: { expense_id: string } }
 ) {
   try {
     const params = await context.params;
 
-    const expense = await getExpenseById(params.rate_id);
+    const expense = await getExpenseById(params.expense_id);
     if (!expense) {
-      return NextResponse.json({ error: "Rate not found" }, { status: 404 });
+      return NextResponse.json({ error: "Expense not found" }, { status: 404 });
     }
     return NextResponse.json(expense, { status: 200 });
   } catch (error) {

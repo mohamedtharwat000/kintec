@@ -1,23 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { additional_review_process } from "@prisma/client";
 
-export const getAllProjectRules = async () => {
-  return prisma.project_rule.findMany({
-    include: {
-      project: true,
-    },
-  });
-};
-
-export const getProjectRuleById = async (id: string) => {
-  return prisma.project_rule.findUnique({
-    where: { project_rule_id: id },
-    include: {
-      project: true,
-    },
-  });
-};
-
 export const createProjectRule = async (data: {
   project_id: string;
   special_project_rules: string;
@@ -32,6 +15,41 @@ export const createProjectRule = async (data: {
       project_rules_reviewer_name: data.project_rules_reviewer_name,
       additional_review_process: data.additional_review_process,
       major_project_indicator: data.major_project_indicator,
+    },
+  });
+};
+
+export const getProjectRuleById = async (id: string) => {
+  return prisma.project_rule.findUnique({
+    where: { project_rule_id: id },
+    include: {
+      project: true,
+    },
+  });
+};
+
+export const updateProjectRule = async (id: string, data: any) => {
+  const { project_id, ...rest } = data;
+
+  return prisma.project_rule.update({
+    where: { project_rule_id: id },
+    data: {
+      ...rest,
+      ...(project_id && { project: { connect: { project_id } } }),
+    },
+  });
+};
+
+export const deleteProjectRule = async (id: string) => {
+  return prisma.project_rule.delete({
+    where: { project_rule_id: id },
+  });
+};
+
+export const getAllProjectRules = async () => {
+  return prisma.project_rule.findMany({
+    include: {
+      project: true,
     },
   });
 };
@@ -63,24 +81,5 @@ export const createProjectRules = async (
     }
 
     return projectRules;
-  });
-};
-
-
-export const updateProjectRule = async (id: string, data: any) => {
-  const { project_id, ...rest } = data;
-
-  return prisma.project_rule.update({
-    where: { project_rule_id: id },
-    data: {
-      ...rest,
-      ...(project_id && { project: { connect: { project_id } } }),
-    },
-  });
-};
-
-export const deleteProjectRule = async (id: string) => {
-  return prisma.project_rule.delete({
-    where: { project_rule_id: id },
   });
 };

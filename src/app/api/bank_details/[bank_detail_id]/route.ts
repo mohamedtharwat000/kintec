@@ -10,8 +10,9 @@ export async function GET(
   context: { params: { bank_detail_id: string } }
 ) {
   try {
-    const { bank_detail_id } = context.params;
-    const bankDetail = await getBankDetailById(bank_detail_id);
+    const params = await context.params;
+
+    const bankDetail = await getBankDetailById(params.bank_detail_id);
     if (!bankDetail) {
       return NextResponse.json(
         { error: "Bank detail not found" },
@@ -33,9 +34,9 @@ export async function PUT(
   context: { params: { bank_detail_id: string } }
 ) {
   try {
-    const { bank_detail_id } = context.params;
+    const params = await context.params;
     const body = await request.json();
-    const updated = await updateBankDetail(bank_detail_id, body);
+    const updated = await updateBankDetail(params.bank_detail_id, body);
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {
     console.error(error);
@@ -51,8 +52,8 @@ export async function DELETE(
   context: { params: { bank_detail_id: string } }
 ) {
   try {
-    const { bank_detail_id } = context.params;
-    await deleteBankDetail(bank_detail_id);
+    const params = await context.params;
+    await deleteBankDetail(params.bank_detail_id);
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error(error);

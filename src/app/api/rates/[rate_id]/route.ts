@@ -10,8 +10,7 @@ export async function GET(
   context: { params: { rate_id: string } }
 ) {
   try {
-    const params = await context.params;
-
+    const params = context.params;
     const rate = await getRateById(params.rate_id);
     if (!rate) {
       return NextResponse.json({ error: "Rate not found" }, { status: 404 });
@@ -31,16 +30,17 @@ export async function PUT(
   context: { params: { rate_id: string } }
 ) {
   try {
-    const params = await context.params;
+    const params = context.params;
     const body = await request.json();
     const updated = await updateRate(params.rate_id, body);
     return NextResponse.json(updated, { status: 200 });
   } catch (error: any) {
-    console.error(error.code);
+    console.error(error);
 
-    //    if (error instanceof Error && "code" in error && error.code === "P2014") {
-    //        return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
-    //      }
+    if (error.message?.includes("PO_id or CWO_id")) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -53,9 +53,9 @@ export async function DELETE(
   context: { params: { rate_id: string } }
 ) {
   try {
-    const params = await context.params;
+    const params = context.params;
     await deleteRate(params.rate_id);
-    // 204 responses typically have no body.
+    // 204 responses typically have no body
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error(error);

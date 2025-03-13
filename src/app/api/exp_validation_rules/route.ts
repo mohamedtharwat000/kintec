@@ -23,11 +23,6 @@ export async function POST(request: Request) {
     const newExpValRule = await createExpenseValidationRule(body);
     return NextResponse.json(newExpValRule, { status: 201 });
   } catch (error: any) {
-    console.error(error.code);
-
-    //    if (error instanceof Error && "code" in error && error.code === "P2014") {
-    //        return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
-    //      }
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

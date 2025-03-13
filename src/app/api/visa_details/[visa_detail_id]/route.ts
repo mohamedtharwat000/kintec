@@ -10,8 +10,9 @@ export async function GET(
   context: { params: { visa_detail_id: string } }
 ) {
   try {
-    const { visa_detail_id } = context.params;
-    const visaDetail = await getVisaDetailById(visa_detail_id);
+    const params = await context.params;
+
+    const visaDetail = await getVisaDetailById(params.visa_detail_id);
     if (!visaDetail) {
       return NextResponse.json(
         { error: "Visa detail not found" },
@@ -33,9 +34,9 @@ export async function PUT(
   context: { params: { visa_detail_id: string } }
 ) {
   try {
-    const { visa_detail_id } = context.params;
+    const params = await context.params;
     const body = await request.json();
-    const updated = await updateVisaDetail(visa_detail_id, body);
+    const updated = await updateVisaDetail(params.visa_detail_id, body);
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {
     console.error(error);
@@ -51,8 +52,8 @@ export async function DELETE(
   context: { params: { visa_detail_id: string } }
 ) {
   try {
-    const { visa_detail_id } = context.params;
-    await deleteVisaDetail(visa_detail_id);
+    const params = await context.params;
+    await deleteVisaDetail(params.visa_detail_id);
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error(error);

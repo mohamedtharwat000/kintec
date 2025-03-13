@@ -5,16 +5,17 @@ import {
   useContractors,
   useDeleteContractor,
   useCreateContractor,
-} from "@/hooks/useApp";
+} from "@/hooks/useContractor";
 import { DataTable } from "@/components/dataTable/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, Pencil, Trash2, Upload } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Upload, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ContractorForm } from "@/components/forms/Contractor";
 import { toast } from "sonner";
 import type { Contractor as ContractorType } from "@/types/Contractor";
-import { parseContractor } from "@/lib/csv";
+import { parseContractor } from "@/lib/csv/contractor";
+import { validateContractors } from "@/lib/validation/contractor";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ContractorDetails } from "@/components/detailsDialogs/Contractor";
 import { CSVPreviewDialog } from "@/components/csvPreviewDialog/Contractor";
+import { tryCatch } from "@/lib/utils";
 
 export function Contractor() {
   const { data: contractors = [], isLoading } = useContractors();
@@ -42,13 +44,14 @@ export function Contractor() {
   const [contractorToDelete, setContractorToDelete] = useState<string | null>(
     null
   );
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // CSV upload state
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [selectedContractorForDetails, setSelectedContractorForDetails] =
+    useState<ContractorType | undefined>(undefined);
+
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [csvData, setCsvData] = useState<Partial<ContractorType>[]>([]);
-  const [csvDataToUpload, setCsvDataToUpload] = useState<
-    Partial<ContractorType>[]
-  >([]);
   const [csvFileName, setCsvFileName] = useState("");
   const [validationErrors, setValidationErrors] = useState<
     { row: number; error: string }[]
@@ -64,31 +67,33 @@ export function Contractor() {
     setIsFormDialogOpen(true);
   };
 
+  const handleDetailsClick = (contractor: ContractorType) => {
+    setSelectedContractorForDetails(contractor);
+    setIsDetailsDialogOpen(true);
+  };
+
   const handleDeleteClick = (contractorId: string) => {
     setContractorToDelete(contractorId);
     setDeleteDialogOpen(true);
   };
 
-  const handleFormClose = () => {
-    setIsFormDialogOpen(false);
-  };
-
-  const handleFormSuccess = () => {
-    // The form itself will handle success actions
-  };
-
   const handleConfirmDelete = async () => {
     if (!contractorToDelete) return;
 
-    try {
-      await deleteContractor.mutateAsync(contractorToDelete);
+    setIsDeleting(true);
+    const { error } = await tryCatch(() =>
+      deleteContractor.mutateAsync(contractorToDelete)
+    );
+
+    if (error) {
+      toast.error("Failed to delete contractor: " + error.message);
+    } else {
       toast.success("Contractor deleted successfully");
-    } catch (error) {
-      toast.error("Failed to delete contractor");
-    } finally {
-      setDeleteDialogOpen(false);
-      setContractorToDelete(null);
     }
+
+    setIsDeleting(false);
+    setDeleteDialogOpen(false);
+    setContractorToDelete(null);
   };
 
   const handleFileUpload = async (
@@ -97,69 +102,71 @@ export function Contractor() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    try {
-      const result = await parseContractor(file);
-      setCsvFileName(file.name);
-      setCsvData(result.data);
-      setCsvDataToUpload(
-        (result.dataToUpload as Partial<ContractorType>[]) || []
-      );
+    const { data, error } = await tryCatch(() => parseContractor(file));
 
-      // Show preview dialog
-      setIsPreviewOpen(true);
-    } catch (error) {
-      console.error("Error parsing CSV:", error);
-      toast.error("Failed to parse CSV file");
-    } finally {
-      // Reset the file input
+    if (error) {
+      toast.error("Failed to parse CSV file: " + error.message);
       event.target.value = "";
+      return;
     }
+
+    if (data) {
+      setCsvFileName(file.name);
+      setCsvData(data.data);
+      setValidationErrors(data.errors || []);
+      setIsPreviewOpen(true);
+    }
+
+    event.target.value = "";
   };
 
-  // Handle CSV data import confirmation
   const handleConfirmCsvUpload = async () => {
-    try {
-      // Submit all CSV data as an array to the API
-      await createContractor.mutateAsync(csvDataToUpload);
-      toast.success(
-        `Successfully imported ${csvDataToUpload.length} contractors`
-      );
+    if (validationErrors.length > 0) {
+      toast.error("Please fix validation errors before uploading");
+      return;
+    }
+
+    const { error } = await tryCatch(() =>
+      createContractor.mutateAsync(csvData)
+    );
+
+    if (error) {
+      toast.error("Failed to import contractors from CSV: " + error.message);
+    } else {
+      toast.success(`Successfully imported ${csvData.length} contractors`);
+      setIsPreviewOpen(false);
       setCsvData([]);
-      setCsvDataToUpload([]);
       setCsvFileName("");
-    } catch (error) {
-      console.error("Error importing CSV data:", error);
-      toast.error("Failed to import contractors from CSV");
-      return Promise.reject(error);
     }
   };
 
   const columns: ColumnDef<ContractorType>[] = [
     {
       accessorKey: "contractor_id",
-      header: "ID",
+      header: () => <div className="text-center">ID</div>,
       cell: ({ row }) => (
-        <div className="font-mono text-xs w-32">
+        <div className="font-mono text-xs truncate !max-w-[100px] md:max-w-none">
           {row.getValue("contractor_id")}
         </div>
       ),
     },
     {
+      id: "name",
       accessorFn: (row) => `${row.first_name} ${row.last_name}`,
-      header: "Name",
+      header: () => <div className="text-center">Name</div>,
       cell: ({ row }) => (
-        <div className="font-medium w-32">
+        <div className="font-medium truncate max-w-[120px] md:max-w-none">
           {`${row.original.first_name} ${row.original.last_name}`}
         </div>
       ),
     },
     {
       accessorKey: "email_address",
-      header: "Email",
+      header: () => <div className="text-center">Email</div>,
       cell: ({ row }) => (
         <a
           href={`mailto:${row.getValue("email_address")}`}
-          className="text-blue-600 hover:underline w-32"
+          className="text-blue-600 hover:underline truncate block max-w-[150px] md:max-w-none"
         >
           {row.getValue("email_address")}
         </a>
@@ -167,26 +174,34 @@ export function Contractor() {
     },
     {
       id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <div className="flex space-x-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleEditClick(row.original.contractor_id)}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleDeleteClick(row.original.contractor_id)}
-          >
-            <Trash2 className="h-4 w-4 text-red-500" />
-          </Button>
-          <ContractorDetails contractor={row.original} />
-        </div>
-      ),
+      header: () => <div className="text-center">Actions</div>,
+      cell: ({ row }) => {
+        return (
+          <div className="flex justify-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleEditClick(row.original.contractor_id)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleDeleteClick(row.original.contractor_id)}
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleDetailsClick(row.original)}
+            >
+              <Info className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
     },
   ];
 
@@ -204,36 +219,40 @@ export function Contractor() {
   );
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex justify-between items-center">
-        <h1 className="text-2xl font-semibold">Contractor Master Data</h1>
-        <div className="flex gap-2">
-          <div className="relative">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleFileUpload}
-              className="hidden"
-              id="csv-upload"
-            />
-            <Button
-              variant="outline"
-              onClick={() => document.getElementById("csv-upload")?.click()}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Upload CSV
-            </Button>
-          </div>
-          <Button onClick={handleAddClick}>
+    <div className="flex flex-col gap-4 p-4">
+      <h1 className="text-xl sm:text-2xl font-semibold">
+        Contractor Master Data
+      </h1>
+      <div className="flex flex-wrap justify-between items-center gap-2">
+        <div className="relative flex flex-1 items-center gap-2">
+          <Button
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={handleAddClick}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Contractor
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => document.getElementById("csv-upload")?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Upload CSV
+          </Button>
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleFileUpload}
+            className="hidden"
+            id="csv-upload"
+          />
         </div>
-      </div>
 
-      <div className="mb-6 flex gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <div className="relative flex flex-1 items-center justify-center gap-2 p-2 min-w-16">
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
           <Input
             className="pl-10"
             placeholder="Search contractors..."
@@ -243,6 +262,7 @@ export function Contractor() {
         </div>
       </div>
 
+      {/* Data Table */}
       <DataTable
         columns={columns}
         data={filteredData}
@@ -250,34 +270,20 @@ export function Contractor() {
         pageSize={10}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              contractor and remove all related data.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Add/Edit Form Dialog */}
       <ContractorForm
         contractorId={selectedContractorId || undefined}
         open={isFormDialogOpen}
-        onClose={handleFormClose}
-        onSuccess={handleFormSuccess}
+        onClose={() => {
+          setIsFormDialogOpen(false);
+        }}
+      />
+
+      {/* Details Dialog */}
+      <ContractorDetails
+        contractor={selectedContractorForDetails}
+        open={isDetailsDialogOpen}
+        onClose={() => setIsDetailsDialogOpen(false)}
       />
 
       {/* CSV Preview Dialog */}
@@ -289,6 +295,45 @@ export function Contractor() {
         onConfirm={handleConfirmCsvUpload}
         validationErrors={validationErrors}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          if (!isDeleting && !open) {
+            setDeleteDialogOpen(false);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              contractor and remove all related data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+            <AlertDialogCancel className="mt-2 sm:mt-0" disabled={isDeleting}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -10,9 +10,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, AlertTriangle, Check, X } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
 import { DataTable } from "@/components/dataTable/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
+import { tryCatch } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface CSVPreviewDialogProps {
   isOpen: boolean;
@@ -32,19 +33,16 @@ export function CSVPreviewDialog({
   validationErrors = [],
 }: CSVPreviewDialogProps) {
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadComplete, setUploadComplete] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const hasErrors = validationErrors.length > 0;
 
-  // Get all unique headers from objects
   const headers =
     data.length > 0
       ? Array.from(new Set(data.flatMap((obj) => Object.keys(obj))))
       : [];
 
-  // Create columns dynamically from headers
   const columns = useMemo(() => {
     const cols: ColumnDef<any>[] = [
       {
@@ -58,7 +56,7 @@ export function CSVPreviewDialog({
         accessorKey: header,
         header: header,
         cell: ({ row }: { row: any }) => (
-          <div className="w-44">{row.original[header]}</div>
+          <div className="w-32 truncate">{row.original[header]}</div>
         ),
       })),
       {
@@ -66,7 +64,7 @@ export function CSVPreviewDialog({
         header: "Status",
         cell: ({ row }) => {
           const rowErrors = validationErrors.filter(
-            (e) => e.row === row.index + 1
+            (e) => e.row === row.index + 2
           );
           return rowErrors.length > 0 ? (
             <div className="flex items-center">
@@ -87,48 +85,54 @@ export function CSVPreviewDialog({
   }, [headers, validationErrors]);
 
   const handleConfirm = async () => {
+    if (hasErrors) {
+      toast.error("Please fix validation errors before uploading");
+      return;
+    }
+
+    setUploadComplete(false);
     setIsUploading(true);
-    setUploadProgress(0);
     setUploadError(null);
 
-    try {
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          const newProgress = prev + Math.random() * 15;
-          return newProgress >= 90 ? 90 : newProgress;
-        });
-      }, 300);
-
+    const { error } = await tryCatch(async () => {
       await onConfirm();
+    });
 
-      clearInterval(progressInterval);
-      setUploadProgress(100);
+    if (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Upload failed";
+      setUploadError(errorMessage);
+      setIsUploading(false);
+      toast.error(`Upload failed: ${errorMessage}`);
+    } else {
+      setIsUploading(false);
       setUploadComplete(true);
-
-      // Auto close after success
+      toast.success(`Successfully uploaded ${data.length} contractor records`);
       setTimeout(() => {
         onClose();
-        setIsUploading(false);
-        setUploadComplete(false);
       }, 1500);
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : "Upload failed");
-      setUploadProgress(0);
-      setIsUploading(false);
     }
   };
 
   return (
     <Dialog
       open={isOpen}
-      onOpenChange={(open) => !open && !isUploading && onClose()}
+      onOpenChange={(open) => {
+        if (!isUploading && !open) {
+          onClose();
+        }
+      }}
     >
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Preview Contractor CSV Data: {fileName}</DialogTitle>
-          <DialogDescription className="hidden" />
+          <DialogDescription>
+            {hasErrors
+              ? `Found ${validationErrors.length} validation issues. Please fix before uploading.`
+              : `Ready to upload ${data.length} contractor records.`}
+          </DialogDescription>
         </DialogHeader>
+
         <div className="flex-grow overflow-auto">
           <div className="flex flex-col flex-grow overflow-hidden">
             {hasErrors && (
@@ -175,16 +179,19 @@ export function CSVPreviewDialog({
             )}
 
             {isUploading && (
-              <div className="mb-4 space-y-2 flex-shrink-0">
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>Uploading {data.length} contractor records...</span>
-                  <span>{Math.round(uploadProgress)}%</span>
+              <div className="mb-4 flex-shrink-0">
+                <div className="flex justify-center">
+                  <div
+                    className="inline-block h-6 w-6 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em]"
+                    role="status"
+                  >
+                    <span className="sr-only">Loading...</span>
+                  </div>
                 </div>
-                <Progress value={uploadProgress} className="h-2" />
               </div>
             )}
 
-            <div className="m-4 flex-shrink-0">
+            <div className="mb-4 flex-shrink-0">
               <p className="text-sm text-muted-foreground mb-2">
                 Preview of {data.length} contractor records
               </p>
@@ -200,11 +207,29 @@ export function CSVPreviewDialog({
         </div>
 
         <DialogFooter className="flex-shrink-0 mt-4 border-t pt-4">
-          <Button variant="outline" onClick={onClose} disabled={isUploading}>
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={isUploading}
+            className="min-w-[100px]"
+          >
             Cancel
           </Button>
-          <Button onClick={handleConfirm} disabled={isUploading || hasErrors}>
-            {isUploading ? "Uploading..." : "Confirm Upload"}
+          <Button
+            onClick={handleConfirm}
+            disabled={isUploading || hasErrors}
+            className="min-w-[150px]"
+          >
+            {isUploading ? (
+              <>
+                <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
+                Uploading...
+              </>
+            ) : hasErrors ? (
+              "Fix Errors to Upload"
+            ) : (
+              "Confirm Upload"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

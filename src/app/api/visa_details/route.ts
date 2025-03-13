@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getAllVisaDetails,
-  createVisaDetail,
+  createVisaDetails,
 } from "@/services/visa_details/visaDetailService";
 
 export async function GET() {
@@ -20,10 +20,16 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const newVisaDetail = await createVisaDetail(body);
-    return NextResponse.json(newVisaDetail, { status: 201 });
+    const visaDetailsData = Array.isArray(body) ? body : [body];
+
+    const newVisaDetails = await createVisaDetails(visaDetailsData);
+
+    return NextResponse.json(newVisaDetails, { status: 201 });
   } catch (error: any) {
-    console.error(error);
+    if (error instanceof Error && "code" in error && error.code === "P2002") {
+      return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

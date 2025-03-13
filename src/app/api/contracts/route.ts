@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   getAllContracts,
   createContract,
+  createContracts,
 } from "@/services/contracts/contractService";
 
 export async function GET() {
@@ -20,8 +21,11 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const newContract = await createContract(body);
-    return NextResponse.json(newContract, { status: 201 });
+    const contractsData = Array.isArray(body) ? body : [body];
+
+    const newContracts = await createContracts(contractsData);
+
+    return NextResponse.json(newContracts, { status: 201 });
   } catch (error: any) {
     console.error(error.code);
     //Contract does not point at a contractor, client_company or a project

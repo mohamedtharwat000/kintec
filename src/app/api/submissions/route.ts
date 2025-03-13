@@ -22,12 +22,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const newSubmission = await createSubmission(body);
     return NextResponse.json(newSubmission, { status: 201 });
-  } catch (error: any) {
-    console.error(error.code);
-    //Contract does not point at a contractor, client_company or a project
-    //   if (error instanceof Error && "code" in error && error.code === "P2025") {
-    //       return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
-    //     }
+  } catch (error) {
+    console.error(error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

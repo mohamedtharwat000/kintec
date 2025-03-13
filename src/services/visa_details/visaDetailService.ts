@@ -5,34 +5,17 @@ import {
   country_id_status,
 } from "@prisma/client";
 
-export const getAllVisaDetails = async () => {
-  return prisma.visa_detail.findMany({
-    include: {
-      contractor: true,
-    },
-  });
-};
-
-export const getVisaDetailById = async (id: string) => {
-  return prisma.visa_detail.findUnique({
-    where: { visa_detail_id: id },
-    include: {
-      contractor: true,
-    },
-  });
-};
-
 export const createVisaDetail = async (data: {
   contractor_id: string;
   visa_number: string;
   visa_type: string;
   visa_country: string;
-  visa_expiry_date: string;
+  visa_expiry_date: string | Date;
   visa_status: visa_status;
   visa_sponsor: string;
   country_id_number: string;
   country_id_type: country_id_type;
-  country_id_expiry_date: string;
+  country_id_expiry_date: string | Date;
   country_id_status: country_id_status;
 }) => {
   return prisma.visa_detail.create({
@@ -49,51 +32,20 @@ export const createVisaDetail = async (data: {
       country_id_expiry_date: new Date(data.country_id_expiry_date),
       country_id_status: data.country_id_status,
     },
+    include: {
+      contractor: true,
+    },
   });
 };
 
-export const createVisaDetails = async (
-  data: Array<{
-    contractor_id: string;
-    visa_number: string;
-    visa_type: string;
-    visa_country: string;
-    visa_expiry_date: string;
-    visa_status: visa_status;
-    visa_sponsor: string;
-    country_id_number: string;
-    country_id_type: country_id_type;
-    country_id_expiry_date: string;
-    country_id_status: country_id_status;
-  }>
-) => {
-  return prisma.$transaction(async (prisma) => {
-    const visaDetails = [];
-
-    for (const visaData of data) {
-      const visaDetail = await prisma.visa_detail.create({
-        data: {
-          contractor: { connect: { contractor_id: visaData.contractor_id } },
-          visa_number: visaData.visa_number,
-          visa_type: visaData.visa_type,
-          visa_country: visaData.visa_country,
-          visa_expiry_date: new Date(visaData.visa_expiry_date),
-          visa_status: visaData.visa_status,
-          visa_sponsor: visaData.visa_sponsor,
-          country_id_number: visaData.country_id_number,
-          country_id_type: visaData.country_id_type,
-          country_id_expiry_date: new Date(visaData.country_id_expiry_date),
-          country_id_status: visaData.country_id_status,
-        },
-      });
-
-      visaDetails.push(visaDetail);
-    }
-
-    return visaDetails;
+export const getVisaDetailById = async (id: string) => {
+  return prisma.visa_detail.findUnique({
+    where: { visa_detail_id: id },
+    include: {
+      contractor: true,
+    },
   });
 };
-
 
 export const updateVisaDetail = async (id: string, data: any) => {
   return prisma.visa_detail.update({
@@ -107,6 +59,9 @@ export const updateVisaDetail = async (id: string, data: any) => {
         country_id_expiry_date: new Date(data.country_id_expiry_date),
       }),
     },
+    include: {
+      contractor: true,
+    },
   });
 };
 
@@ -114,4 +69,37 @@ export const deleteVisaDetail = async (id: string) => {
   return prisma.visa_detail.delete({
     where: { visa_detail_id: id },
   });
+};
+
+export const getAllVisaDetails = async () => {
+  return prisma.visa_detail.findMany({
+    include: {
+      contractor: true,
+    },
+  });
+};
+
+export const createVisaDetails = async (
+  data: Array<{
+    contractor_id: string;
+    visa_number: string;
+    visa_type: string;
+    visa_country: string;
+    visa_expiry_date: string | Date;
+    visa_status: visa_status;
+    visa_sponsor: string;
+    country_id_number: string;
+    country_id_type: country_id_type;
+    country_id_expiry_date: string | Date;
+    country_id_status: country_id_status;
+  }>
+) => {
+  const visaDetails = [];
+
+  for (const visaData of data) {
+    const visaDetail = await createVisaDetail(visaData);
+    visaDetails.push(visaDetail);
+  }
+
+  return visaDetails;
 };

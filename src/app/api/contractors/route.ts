@@ -26,13 +26,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(newContractors, { status: 201 });
   } catch (error: any) {
-    console.error(error);
-
-    if (error?.code === "P2002") {
-      return NextResponse.json(
-        { error: "Duplicate contractor ID" },
-        { status: 400 }
-      );
+    if (error instanceof Error && "code" in error && error.code === "P2002") {
+      return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
     }
 
     return NextResponse.json(

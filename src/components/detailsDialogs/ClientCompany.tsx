@@ -5,9 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -30,15 +28,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Info } from "lucide-react";
+import { FileText } from "lucide-react";
 import { ClientCompany } from "@/types/ClientCompany";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ClientCompanyDetailsProps {
-  company: ClientCompany;
+  company?: ClientCompany;
+  open: boolean;
+  onClose: () => void;
 }
 
-// Format date to readable string
 const formatDate = (date: Date) => {
   return new Date(date).toLocaleDateString("en-US", {
     year: "numeric",
@@ -47,14 +45,15 @@ const formatDate = (date: Date) => {
   });
 };
 
-export function ClientCompanyDetails({ company }: ClientCompanyDetailsProps) {
+export function ClientCompanyDetails({
+  company,
+  open,
+  onClose,
+}: ClientCompanyDetailsProps) {
+  if (!company) return null;
+
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <Info className="h-4 w-4" />
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[85vw] max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">

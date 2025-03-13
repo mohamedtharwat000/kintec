@@ -1,8 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { common_rejection_type } from "@prisma/client";
 
-export const getAllCommonRejections = async () => {
-  return prisma.common_rejection.findMany();
+export const createCommonRejection = async (data: {
+  common_rejection_type: common_rejection_type;
+  resolution_process: string;
+}) => {
+  return prisma.common_rejection.create({
+    data,
+  });
 };
 
 export const getCommonRejectionById = async (id: string) => {
@@ -11,13 +16,21 @@ export const getCommonRejectionById = async (id: string) => {
   });
 };
 
-export const createCommonRejection = async (data: {
-  common_rejection_type: common_rejection_type;
-  resolution_process: string;
-}) => {
-  return prisma.common_rejection.create({
+export const updateCommonRejection = async (id: string, data: any) => {
+  return prisma.common_rejection.update({
+    where: { common_rejection_id: id },
     data,
   });
+};
+
+export const deleteCommonRejection = async (id: string) => {
+  return prisma.common_rejection.delete({
+    where: { common_rejection_id: id },
+  });
+};
+
+export const getAllCommonRejections = async () => {
+  return prisma.common_rejection.findMany();
 };
 
 export const createCommonRejections = async (
@@ -38,19 +51,5 @@ export const createCommonRejections = async (
     }
 
     return commonRejections;
-  });
-};
-
-
-export const updateCommonRejection = async (id: string, data: any) => {
-  return prisma.common_rejection.update({
-    where: { common_rejection_id: id },
-    data,
-  });
-};
-
-export const deleteCommonRejection = async (id: string) => {
-  return prisma.common_rejection.delete({
-    where: { common_rejection_id: id },
   });
 };

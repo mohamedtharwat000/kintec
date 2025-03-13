@@ -1,0 +1,3 @@
+contractor_id,bank_name,account_number,IBAN,SWIFT,currency,bank_detail_type,bank_detail_validated
+    0bcb4f97-5845-4c62-a443-40210ae44722,Deutsche Bank,12345678,DE89370400440532013000,DEUTDEFF,EUR,primary,TRUE
+    0bcb4f97-5845-4c62-a443-40210ae44722,HSBC,87654321,GB29NWBK60161331926819,HSBCGB2L,GBP,secondary,FALSE

@@ -6,8 +6,8 @@ import {
 
 export async function GET() {
   try {
-    const sub_val_rules = await getAllSubmissionValidationRules();
-    return NextResponse.json(sub_val_rules, { status: 200 });
+    const rules = await getAllSubmissionValidationRules();
+    return NextResponse.json(rules, { status: 200 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -20,14 +20,10 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const newSubValRule = await createSubmissionValidationRule(body);
-    return NextResponse.json(newSubValRule, { status: 201 });
-  } catch (error: any) {
-    console.error(error.code);
-
-    //    if (error instanceof Error && "code" in error && error.code === "P2014") {
-    //        return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
-    //      }
+    const newRule = await createSubmissionValidationRule(body);
+    return NextResponse.json(newRule, { status: 201 });
+  } catch (error) {
+    console.error(error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

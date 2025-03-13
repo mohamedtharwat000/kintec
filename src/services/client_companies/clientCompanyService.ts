@@ -1,9 +1,13 @@
 import { prisma } from "@/lib/prisma";
 
-export const getAllClientCompanies = async () => {
-  return prisma.client_company.findMany({
-    include: {
-      contracts: true,
+export const createClientCompany = async (data: {
+  client_name: string;
+  contact_email: string;
+  invoice_submission_deadline?: string;
+}) => {
+  return prisma.client_company.create({
+    data: {
+      ...data,
     },
   });
 };
@@ -13,18 +17,6 @@ export const getClientCompanyById = async (id: string) => {
     where: { client_company_id: id },
     include: {
       contracts: true,
-    },
-  });
-};
-
-export const createClientCompany = async (data: {
-  client_name: string;
-  contact_email: string;
-  invoice_submission_deadline?: string;
-}) => {
-  return prisma.client_company.create({
-    data: {
-      ...data,
     },
   });
 };
@@ -42,6 +34,14 @@ export const deleteClientCompany = async (id: string) => {
   });
 };
 
+export const getAllClientCompanies = async () => {
+  return prisma.client_company.findMany({
+    include: {
+      contracts: true,
+    },
+  });
+};
+
 export const createClientCompanies = async (
   data: Array<{
     client_name: string;
@@ -49,19 +49,12 @@ export const createClientCompanies = async (
     invoice_submission_deadline?: string;
   }>
 ) => {
-  return prisma.$transaction(async (prisma) => {
-    const companies = [];
+  const companies = [];
 
-    for (const companyData of data) {
-      const company = await prisma.client_company.create({
-        data: {
-          ...companyData,
-        },
-      });
+  for (const companyData of data) {
+    const company = await createClientCompany(companyData);
+    companies.push(company);
+  }
 
-      companies.push(company);
-    }
-
-    return companies;
-  });
+  return companies;
 };
