@@ -44,10 +44,10 @@ interface SidebarProps {
 
 export function AppSidebar({ currentView, onNavigation }: SidebarProps) {
   return (
-    <Sidebar className="absolute top-2">
-      <SidebarContent className="bg-background text-foreground">
-        <SidebarGroup className="bg-background text-foreground">
-          <SidebarGroupContent className="bg-background text-foreground">
+    <Sidebar className="absolute top-2 overflow-auto">
+      <SidebarContent className="bg-background text-foreground overflow-auto">
+        <SidebarGroup className="bg-background text-foreground overflow-auto">
+          <SidebarGroupContent className="bg-background text-foreground overflow-auto mb-16">
             <SidebarMenu>
               {/* Dashboard Section */}
               <SidebarMenuItem>

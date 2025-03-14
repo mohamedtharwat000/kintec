@@ -156,7 +156,7 @@ export function BankDetail() {
       accessorKey: "bank_detail_id",
       header: () => <div className="text-center">ID</div>,
       cell: ({ row }) => (
-        <div className="font-mono text-xs truncate !max-w-[100px] md:max-w-none">
+        <div className="font-medium text-center truncate max-w-[120px] md:max-w-none">
           {row.getValue("bank_detail_id")}
         </div>
       ),
@@ -165,7 +165,7 @@ export function BankDetail() {
       accessorKey: "contractor_id",
       header: () => <div className="text-center">Contractor</div>,
       cell: ({ row }) => (
-        <div className="font-medium truncate max-w-[120px] md:max-w-none">
+        <div className="font-medium text-center truncate max-w-[120px] md:max-w-none">
           {getContractorName(row.getValue("contractor_id"))}
         </div>
       ),
@@ -174,25 +174,9 @@ export function BankDetail() {
       accessorKey: "bank_name",
       header: () => <div className="text-center">Bank Name</div>,
       cell: ({ row }) => (
-        <div className="truncate max-w-[120px] md:max-w-none">
+        <div className="font-medium text-center truncate max-w-[120px] md:max-w-none">
           {row.getValue("bank_name")}
         </div>
-      ),
-    },
-    {
-      accessorKey: "IBAN",
-      header: () => <div className="text-center">IBAN</div>,
-      cell: ({ row }) => (
-        <div className="font-mono text-xs truncate max-w-[150px] md:max-w-none">
-          {row.getValue("IBAN")}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "bank_detail_type",
-      header: () => <div className="text-center">Type</div>,
-      cell: ({ row }) => (
-        <div className="capitalize">{row.getValue("bank_detail_type")}</div>
       ),
     },
     {

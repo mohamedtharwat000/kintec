@@ -145,7 +145,7 @@ export function Contractor() {
       accessorKey: "contractor_id",
       header: () => <div className="text-center">ID</div>,
       cell: ({ row }) => (
-        <div className="font-mono text-xs truncate !max-w-[100px] md:max-w-none">
+        <div className="font-medium text-center truncate max-w-[120px] md:max-w-none">
           {row.getValue("contractor_id")}
         </div>
       ),
@@ -155,7 +155,7 @@ export function Contractor() {
       accessorFn: (row) => `${row.first_name} ${row.last_name}`,
       header: () => <div className="text-center">Name</div>,
       cell: ({ row }) => (
-        <div className="font-medium truncate max-w-[120px] md:max-w-none">
+        <div className="font-medium text-center truncate max-w-[120px] md:max-w-none">
           {`${row.original.first_name} ${row.original.last_name}`}
         </div>
       ),
@@ -166,7 +166,7 @@ export function Contractor() {
       cell: ({ row }) => (
         <a
           href={`mailto:${row.getValue("email_address")}`}
-          className="text-blue-600 hover:underline truncate block max-w-[150px] md:max-w-none"
+          className="block text-blue-600 hover:underline font-medium text-center truncate max-w-[120px] md:max-w-none"
         >
           {row.getValue("email_address")}
         </a>

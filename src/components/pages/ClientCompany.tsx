@@ -143,7 +143,7 @@ export function ClientCompany() {
       accessorKey: "client_company_id",
       header: () => <div className="text-center">Company ID</div>,
       cell: ({ row }) => (
-        <div className="font-mono text-xs truncate !max-w-[100px] md:max-w-none">
+        <div className="font-medium text-center truncate max-w-[120px] md:max-w-none">
           {row.getValue("client_company_id")}
         </div>
       ),
@@ -152,7 +152,7 @@ export function ClientCompany() {
       accessorKey: "client_name",
       header: () => <div className="text-center">Name</div>,
       cell: ({ row }) => (
-        <div className="font-medium truncate max-w-[120px] md:max-w-none">
+        <div className="font-medium text-center truncate max-w-[120px] md:max-w-none">
           {row.getValue("client_name")}
         </div>
       ),
@@ -163,7 +163,7 @@ export function ClientCompany() {
       cell: ({ row }) => (
         <a
           href={`mailto:${row.getValue("contact_email")}`}
-          className="text-blue-600 hover:underline truncate block max-w-[150px] md:max-w-none"
+          className="block text-blue-600 hover:underline font-medium text-center truncate max-w-[120px] md:max-w-none"
         >
           {row.getValue("contact_email")}
         </a>

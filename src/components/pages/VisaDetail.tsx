@@ -143,7 +143,6 @@ export function VisaDetail() {
     }
   };
 
-  // Get contractor name by ID
   const getContractorName = (contractorId: string) => {
     const contractor = contractors.find(
       (c) => c.contractor_id === contractorId
@@ -158,7 +157,7 @@ export function VisaDetail() {
       accessorKey: "visa_detail_id",
       header: () => <div className="text-center">ID</div>,
       cell: ({ row }) => (
-        <div className="font-mono text-xs truncate !max-w-[100px] md:max-w-none">
+        <div className="font-medium text-center truncate max-w-[120px] md:max-w-none">
           {row.getValue("visa_detail_id")}
         </div>
       ),
@@ -167,7 +166,7 @@ export function VisaDetail() {
       accessorKey: "contractor_id",
       header: () => <div className="text-center">Contractor</div>,
       cell: ({ row }) => (
-        <div className="font-medium truncate max-w-[120px] md:max-w-none">
+        <div className="font-medium text-center truncate max-w-[120px] md:max-w-none">
           {getContractorName(row.getValue("contractor_id"))}
         </div>
       ),
@@ -176,7 +175,7 @@ export function VisaDetail() {
       accessorKey: "visa_number",
       header: () => <div className="text-center">Visa Number</div>,
       cell: ({ row }) => (
-        <div className="truncate max-w-[120px] md:max-w-none">
+        <div className="font-medium text-center truncate max-w-[120px] md:max-w-none">
           {row.getValue("visa_number")}
         </div>
       ),
