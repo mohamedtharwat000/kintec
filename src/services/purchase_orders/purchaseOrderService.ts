@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { PO_status } from "@prisma/client";
 
 export const createPurchaseOrder = async (data: {
+  PO_id?: string;
   contract_id: string;
   PO_start_date: string;
   PO_end_date: string;
@@ -11,6 +12,7 @@ export const createPurchaseOrder = async (data: {
 }) => {
   return prisma.purchase_order.create({
     data: {
+      PO_id: data.PO_id || undefined,
       contract: { connect: { contract_id: data.contract_id } },
       PO_start_date: new Date(data.PO_start_date),
       PO_end_date: new Date(data.PO_end_date),

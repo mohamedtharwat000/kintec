@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
 export const createContractor = async (data: {
+  contractor_id?: string;
   first_name: string;
   middle_name?: string;
   last_name: string;
@@ -12,7 +13,10 @@ export const createContractor = async (data: {
   country_of_residence: string;
 }) => {
   return prisma.contractor.create({
-    data,
+    data: {
+      ...data,
+      contractor_id: data.contractor_id || undefined,
+    },
   });
 };
 
@@ -54,6 +58,7 @@ export const getAllContractors = async () => {
 
 export const createContractors = async (
   data: Array<{
+    contractor_id?: string;
     first_name: string;
     middle_name?: string;
     last_name: string;
@@ -69,8 +74,9 @@ export const createContractors = async (
     const contractors = [];
 
     for (const contractorData of data) {
+      const contData = { ...contractorData, contractor_id: contractorData.contractor_id || undefined, }
       const contractor = await prisma.contractor.create({
-        data: contractorData,
+        data: contData,
       });
 
       contractors.push(contractor);

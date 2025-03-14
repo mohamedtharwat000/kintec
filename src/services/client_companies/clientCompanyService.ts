@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import { object } from "zod";
 
 export const createClientCompany = async (data: {
+  client_company_id?: string;
   client_name: string;
   contact_email: string;
   invoice_submission_deadline?: string;
@@ -8,6 +10,7 @@ export const createClientCompany = async (data: {
   return prisma.client_company.create({
     data: {
       ...data,
+      client_company_id: data.client_company_id || undefined,
     },
   });
 };
@@ -44,6 +47,7 @@ export const getAllClientCompanies = async () => {
 
 export const createClientCompanies = async (
   data: Array<{
+    client_company_id?: string;
     client_name: string;
     contact_email: string;
     invoice_submission_deadline?: string;
@@ -52,7 +56,8 @@ export const createClientCompanies = async (
   const companies = [];
 
   for (const companyData of data) {
-    const company = await createClientCompany(companyData);
+    const compData = { ...companyData, client_company_id: companyData.client_company_id || undefined, }
+    const company = await createClientCompany(compData);
     companies.push(company);
   }
 

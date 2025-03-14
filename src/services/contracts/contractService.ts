@@ -2,6 +2,7 @@ import { contract_status } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export const createContract = async (data: {
+  contract_id?: string;
   contractor_id: string;
   client_company_id: string;
   project_id: string;
@@ -16,6 +17,7 @@ export const createContract = async (data: {
 }) => {
   return prisma.contract.create({
     data: {
+      contract_id: data.contract_id || undefined,
       contractor: { connect: { contractor_id: data.contractor_id } },
       client_company: {
         connect: { client_company_id: data.client_company_id },
@@ -95,6 +97,7 @@ export const getAllContracts = async () => {
 
 export const createContracts = async (
   data: Array<{
+    contract_id?: string;
     contractor_id: string;
     client_company_id: string;
     project_id: string;
@@ -111,7 +114,8 @@ export const createContracts = async (
   const contracts = [];
 
   for (const contractData of data) {
-    const contract = await createContract(contractData);
+    const contData = { ...contractData, contract_id: contractData.contract_id || undefined, }
+    const contract = await createContract(contData);
     contracts.push(contract);
   }
 
