@@ -5,53 +5,68 @@ import {
   useInvoices,
   useDeleteInvoice,
   useCreateInvoice,
+  useSearchFilter,
+  useParseInvoiceCsv,
 } from "@/hooks/useInvoices";
 import { DataTable } from "@/components/dataTable/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, Pencil, Trash2, Upload } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Upload, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import type { Invoice as InvoiceType } from "@/types/Invoice";
-import { toast } from "sonner";
-import { parseInvoice } from "@/lib/csv/invoice";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { CSVPreviewDialog } from "@/components/csvPreviewDialog/Invoice";
-import { InvoiceDetails } from "@/components/000/Invoice";
 import { InvoiceForm } from "@/components/forms/Invoice";
+import { Badge } from "@/components/ui/badge";
+import { InvoiceView, InvoiceStatus, InvoiceType } from "@/types/Invoice";
+import { toast } from "sonner";
+import { CSVPreviewDialog } from "@/components/reusableModels/CSVPreviewDialog";
+import { DeleteConfirmationDialog } from "@/components/reusableModels/DeleteConfirmationDialog";
+import {
+  DetailsDialog,
+  DetailSection,
+} from "@/components/reusableModels/DetailsDialog";
+import { format } from "date-fns";
 
 export function Invoice() {
-  const { data: invoices = [], isLoading } = useInvoices();
+  // Core data fetching hook
+  const { data: invoices = [], isLoading, refetch } = useInvoices();
   const deleteInvoice = useDeleteInvoice();
   const createInvoice = useCreateInvoice();
+  const parseCSV = useParseInvoiceCsv();
 
+  // Page-level state management
   const [searchTerm, setSearchTerm] = useState("");
-  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(
-    null
-  );
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
 
-  // CSV upload state
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [csvData, setCsvData] = useState<Partial<InvoiceType>[]>([]);
-  const [csvFileName, setCsvFileName] = useState("");
-  const [validationErrors, setValidationErrors] = useState<
+  // Form dialog state
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | undefined>();
+
+  // Details dialog state
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [selectedInvoiceForDetails, setSelectedInvoiceForDetails] = useState<
+    InvoiceView | undefined
+  >(undefined);
+
+  // CSV dialog state
+  const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvValidationErrors, setCsvValidationErrors] = useState<
     { row: number; error: string }[]
   >([]);
 
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
+
+  // Filter data based on search term
+  const filteredData = useSearchFilter<InvoiceView>(
+    invoices,
+    searchTerm,
+    ["invoice_id", "invoice_currency", "invoice_status", "invoice_type"]
+  );
+
+  // Simple handlers for UI actions
   const handleAddClick = () => {
-    setSelectedInvoiceId(null);
+    setSelectedInvoiceId(undefined);
     setIsFormDialogOpen(true);
   };
 
@@ -60,120 +75,196 @@ export function Invoice() {
     setIsFormDialogOpen(true);
   };
 
+  const handleDetailsClick = (invoice: InvoiceView) => {
+    setSelectedInvoiceForDetails(invoice);
+    setIsDetailsDialogOpen(true);
+  };
+
   const handleDeleteClick = (invoiceId: string) => {
     setInvoiceToDelete(invoiceId);
     setDeleteDialogOpen(true);
   };
 
-  const handleFormClose = () => {
-    setIsFormDialogOpen(false);
-  };
-
-  const handleFormSuccess = () => {
-    setIsFormDialogOpen(false);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!invoiceToDelete) return;
-
-    try {
-      await deleteInvoice.mutateAsync(invoiceToDelete);
-      toast.success("Invoice deleted successfully");
-    } catch (error) {
-      toast.error("Failed to delete invoice");
-    } finally {
-      setDeleteDialogOpen(false);
-      setInvoiceToDelete(null);
-    }
-  };
-
-  const handleFileUpload = async (
+  const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      setUploadFile(file);
 
-    try {
-      const result = await parseInvoice(file);
-      setCsvFileName(file.name);
-      setCsvData(result.data);
+      const result = await parseCSV(file);
+      if (result.data) {
+        setCsvData(result.data.data);
+        setCsvValidationErrors(result.data.errors);
+        setIsCSVDialogOpen(true);
+      } else if (result.error) {
+        toast.error(`Failed to parse CSV: ${result.error.message}`);
+      }
 
-      // Validate data
-      const errors: { row: number; error: string }[] = [];
-      result.data.forEach((item, index) => {
-        if (!item.billing_period) {
-          errors.push({ row: index + 1, error: "Billing period is required" });
-        }
-        if (!item.invoice_status) {
-          errors.push({ row: index + 1, error: "Invoice status is required" });
-        }
-        if (!item.invoice_type) {
-          errors.push({ row: index + 1, error: "Invoice type is required" });
-        }
-        if (!item.invoice_currency) {
-          errors.push({ row: index + 1, error: "Currency is required" });
-        }
-        if (!item.invoice_total_value) {
-          errors.push({ row: index + 1, error: "Total value is required" });
-        }
-        if (!item.PO_id && !item.CWO_id) {
-          errors.push({
-            row: index + 1,
-            error: "Either PO ID or CWO ID is required",
-          });
-        }
-        if (item.PO_id && item.CWO_id) {
-          errors.push({
-            row: index + 1,
-            error: "Only one of PO ID or CWO ID should be provided",
-          });
-        }
-      });
-
-      setValidationErrors(errors);
-
-      // Show preview dialog
-      setIsPreviewOpen(true);
-    } catch (error) {
-      console.error("Error parsing CSV:", error);
-      toast.error("Failed to parse CSV file");
-    } finally {
-      // Reset the file input
       event.target.value = "";
     }
   };
 
-  // Handle CSV data import confirmation
-  const handleConfirmCsvUpload = async () => {
-    try {
-      // Process each invoice one by one
-      for (const invoice of csvData) {
-        await createInvoice.mutateAsync(invoice as any);
-      }
+  const handleCSVDialogClose = () => {
+    setIsCSVDialogOpen(false);
+    setCsvData([]);
+    setCsvValidationErrors([]);
+    setUploadFile(null);
+  };
 
+  const handleCsvUpload = async () => {
+    if (!csvData.length) return;
+
+    try {
+      await createInvoice.mutateAsync(csvData);
       toast.success(`Successfully imported ${csvData.length} invoices`);
-      return Promise.resolve();
+      refetch();
+      setIsCSVDialogOpen(false);
+
+      setCsvData([]);
+      setCsvValidationErrors([]);
+      setUploadFile(null);
     } catch (error) {
-      console.error("Error importing CSV data:", error);
-      toast.error("Failed to import invoices from CSV");
-      return Promise.reject(error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to import invoices: ${errorMessage}`);
     }
   };
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+  const handleFormSuccess = () => {
+    refetch();
+    setIsFormDialogOpen(false);
   };
 
-  const columns: ColumnDef<InvoiceType>[] = [
+  // Helper function to safely convert any value to a number
+  const safelyParseNumber = (value: any): number => {
+    if (typeof value === "number") return value;
+    if (value === null || value === undefined) return 0;
+    // Handle Decimal objects from Prisma
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "toNumber" in value &&
+      typeof value.toNumber === "function"
+    ) {
+      return value.toNumber();
+    }
+    return Number(value) || 0;
+  };
+
+  const formatDate = (date: Date) => {
+    return format(new Date(date), "PP");
+  };
+
+  const formatCurrency = (value: any, currency: string) => {
+    return `${currency} ${safelyParseNumber(value).toFixed(2)}`;
+  };
+
+  const getStatusColor = (status: InvoiceStatus) => {
+    const colorMap: Record<InvoiceStatus, string> = {
+      pending: "bg-amber-500 hover:bg-amber-600",
+      paid: "bg-green-500 hover:bg-green-600",
+    };
+    return colorMap[status] || "bg-blue-500 hover:bg-blue-600";
+  };
+
+  // Generate detail sections for the Invoice
+  const getInvoiceDetailSections = (): DetailSection[] => {
+    if (!selectedInvoiceForDetails) return [];
+
+    return [
+      {
+        title: "Invoice Information",
+        items: [
+          { label: "Invoice ID", value: selectedInvoiceForDetails.invoice_id },
+          {
+            label: "Billing Period",
+            value: formatDate(selectedInvoiceForDetails.billing_period),
+          },
+          {
+            label: "Status",
+            value: (
+              <Badge
+                className={getStatusColor(selectedInvoiceForDetails.invoice_status as InvoiceStatus)}
+              >
+                {selectedInvoiceForDetails.invoice_status}
+              </Badge>
+            ),
+          },
+          { label: "Type", value: selectedInvoiceForDetails.invoice_type },
+          {
+            label: "Total Value",
+            value: formatCurrency(
+              selectedInvoiceForDetails.invoice_total_value,
+              selectedInvoiceForDetails.invoice_currency
+            ),
+          },
+          { label: "Currency", value: selectedInvoiceForDetails.invoice_currency },
+          {
+            label: "Withholding Tax",
+            value: selectedInvoiceForDetails.wht_applicable
+              ? `${selectedInvoiceForDetails.wht_rate}%`
+              : "Not Applicable",
+          },
+          {
+            label: "External Assignment",
+            value: selectedInvoiceForDetails.external_assignment ? "Yes" : "No",
+          },
+        ],
+      },
+      ...(selectedInvoiceForDetails.purchase_order
+        ? [
+            {
+              title: "Related Purchase Order",
+              items: [
+                {
+                  label: "PO ID",
+                  value: selectedInvoiceForDetails.purchase_order.PO_id,
+                },
+                {
+                  label: "PO Status",
+                  value: selectedInvoiceForDetails.purchase_order.PO_status,
+                },
+                {
+                  label: "Contract",
+                  value: selectedInvoiceForDetails.purchase_order.contract?.job_title || "N/A",
+                },
+              ],
+            },
+          ]
+        : []),
+      ...(selectedInvoiceForDetails.calloff_work_order
+        ? [
+            {
+              title: "Related Call-off Work Order",
+              items: [
+                {
+                  label: "CWO ID",
+                  value: selectedInvoiceForDetails.calloff_work_order.CWO_id,
+                },
+                {
+                  label: "CWO Status",
+                  value: selectedInvoiceForDetails.calloff_work_order.CWO_status,
+                },
+                {
+                  label: "Contract",
+                  value: selectedInvoiceForDetails.calloff_work_order.contract?.job_title || "N/A",
+                },
+              ],
+            },
+          ]
+        : []),
+    ];
+  };
+
+  const columns: ColumnDef<InvoiceView>[] = [
     {
       accessorKey: "invoice_id",
-      header: "ID",
+      header: "Invoice ID",
       cell: ({ row }) => (
-        <div className="font-mono text-xs">{row.getValue("invoice_id")}</div>
+        <div className="font-mono text-xs truncate max-w-[120px] md:max-w-none">
+          {row.getValue("invoice_id")}
+        </div>
       ),
     },
     {
@@ -187,19 +278,10 @@ export function Invoice() {
       accessorKey: "invoice_status",
       header: "Status",
       cell: ({ row }) => {
-        const status = row.getValue("invoice_status") as string;
-        const colorMap: Record<string, string> = {
-          pending: "bg-amber-500",
-          paid: "bg-green-500",
-        };
-
+        const status = row.getValue("invoice_status") as InvoiceStatus;
         return (
-          <Badge
-            className={`${colorMap[status] || "bg-blue-500"} hover:${
-              colorMap[status] || "bg-blue-500"
-            }`}
-          >
-            {status}
+          <Badge className={getStatusColor(status)}>
+            {status.charAt(0).toUpperCase() + status.slice(1)}
           </Badge>
         );
       },
@@ -218,14 +300,11 @@ export function Invoice() {
       cell: ({ row }) => {
         const value = row.getValue("invoice_total_value");
         const currency = row.original.invoice_currency;
-        return (
-          <div className="font-mono">
-            {currency} {parseFloat(value as string).toFixed(2)}
-          </div>
-        );
+        return <div className="font-mono">{formatCurrency(value, currency)}</div>;
       },
     },
     {
+      id: "relatedTo",
       header: "Related To",
       cell: ({ row }) => {
         if (row.original.purchase_order) {
@@ -254,73 +333,71 @@ export function Invoice() {
     {
       id: "actions",
       header: "Actions",
-      cell: ({ row }) => (
-        <div className="flex space-x-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleEditClick(row.original.invoice_id)}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleDeleteClick(row.original.invoice_id)}
-          >
-            <Trash2 className="h-4 w-4 text-red-500" />
-          </Button>
-          <InvoiceDetails invoice={row.original} />
-        </div>
-      ),
+      cell: ({ row }) => {
+        return (
+          <div className="flex justify-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleEditClick(row.original.invoice_id)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleDeleteClick(row.original.invoice_id)}
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleDetailsClick(row.original)}
+            >
+              <Info className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
     },
   ];
 
-  const filteredData = invoices.filter(
-    (invoice) =>
-      invoice.invoice_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.invoice_currency
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      (invoice.purchase_order?.PO_id || "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      (invoice.calloff_work_order?.CWO_id || "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase())
-  );
-
   return (
-    <div className="p-8">
-      <div className="mb-8 flex justify-between items-center">
-        <h1 className="text-2xl font-semibold">Invoice Management</h1>
-        <div className="flex gap-2">
-          <div className="relative">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleFileUpload}
-              className="hidden"
-              id="csv-upload"
-            />
-            <Button
-              variant="outline"
-              onClick={() => document.getElementById("csv-upload")?.click()}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Upload CSV
-            </Button>
-          </div>
-          <Button onClick={handleAddClick}>
+    <div className="flex flex-col gap-4 p-4">
+      <h1 className="text-xl sm:text-2xl font-semibold">
+        Invoice Management
+      </h1>
+      <div className="flex flex-wrap justify-between items-center gap-2">
+        <div className="relative flex flex-1 items-center gap-2">
+          <Button
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={handleAddClick}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Invoice
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => document.getElementById("csv-upload")?.click()}
+          ></Button>
+            <Upload className="mr-2 h-4 w-4" >
+            Upload CSV
+          </Button>
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleFileChange}
+            className="hidden"
+            id="csv-upload"
+          />
         </div>
-      </div>
 
-      <div className="mb-6 flex gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <div className="relative flex flex-1 items-center justify-center gap-2 p-2 min-w-16">
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
           <Input
             className="pl-10"
             placeholder="Search invoices..."
@@ -330,6 +407,7 @@ export function Invoice() {
         </div>
       </div>
 
+      {/* Data Table */}
       <DataTable
         columns={columns}
         data={filteredData}
@@ -339,42 +417,46 @@ export function Invoice() {
 
       {/* Add/Edit Form Dialog */}
       <InvoiceForm
-        invoiceId={selectedInvoiceId || undefined}
+        invoiceId={selectedInvoiceId}
         open={isFormDialogOpen}
-        onClose={handleFormClose}
+        onClose={() => setIsFormDialogOpen(false)}
         onSuccess={handleFormSuccess}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              invoice and may affect related records.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Details Dialog */}
+      {selectedInvoiceForDetails && (
+        <DetailsDialog
+          title={`Invoice: ${selectedInvoiceForDetails.invoice_id}`}
+          open={isDetailsDialogOpen}
+          onClose={() => setIsDetailsDialogOpen(false)}
+          sections={getInvoiceDetailSections()}
+        />
+      )}
 
       {/* CSV Preview Dialog */}
-      <CSVPreviewDialog
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        data={csvData}
-        fileName={csvFileName}
-        onConfirm={handleConfirmCsvUpload}
-        validationErrors={validationErrors}
+      {uploadFile && (
+        <CSVPreviewDialog
+          isOpen={isCSVDialogOpen}
+          onClose={handleCSVDialogClose}
+          data={csvData}
+          fileName={uploadFile.name}
+          onConfirm={handleCsvUpload}
+          validationErrors={csvValidationErrors}
+          title="Import Invoices"
+          description="Review invoice data before import"
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onDelete={deleteInvoice.mutateAsync}
+        itemId={invoiceToDelete}
+        title="Delete Invoice"
+        description="Are you sure you want to delete this invoice? This action cannot be undone."
+        successMessage="Invoice deleted successfully"
+        errorMessage="Failed to delete invoice"
       />
     </div>
   );

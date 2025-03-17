@@ -75,18 +75,18 @@ export function App({ dashboard }: AppProps) {
         return <Expense />;
       case "expenseValidationRules":
         return <ExpenseValidationRule />;
-      case "invoices":
-        return <Invoice />;
-      case "invoiceFormattingRules":
-        return <InvoiceFormattingRule />;
-      case "rates":
-        return <Rate />;
-      case "submissions":
-        return <Submission />;
-      case "submissionValidationRules":
-        return <SubmissionValidationRule />;
-      case "reviews":
-        return <Review />;
+      // case "invoices":
+      //   return <Invoice />;
+      // case "invoiceFormattingRules":
+      //   return <InvoiceFormattingRule />;
+      // case "rates":
+      //   return <Rate />;
+      // case "submissions":
+      //   return <Submission />;
+      // case "submissionValidationRules":
+      //   return <SubmissionValidationRule />;
+      // case "reviews":
+      //   return <Review />;
     }
   };
 
