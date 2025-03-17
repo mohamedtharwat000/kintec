@@ -37,7 +37,9 @@ export function Invoice() {
 
   // Form dialog state
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | undefined>();
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<
+    string | undefined
+  >();
 
   // Details dialog state
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
@@ -58,11 +60,12 @@ export function Invoice() {
   const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
 
   // Filter data based on search term
-  const filteredData = useSearchFilter<InvoiceView>(
-    invoices,
-    searchTerm,
-    ["invoice_id", "invoice_currency", "invoice_status", "invoice_type"]
-  );
+  const filteredData = useSearchFilter<InvoiceView>(invoices, searchTerm, [
+    "invoice_id",
+    "invoice_currency",
+    "invoice_status",
+    "invoice_type",
+  ]);
 
   // Simple handlers for UI actions
   const handleAddClick = () => {
@@ -185,7 +188,9 @@ export function Invoice() {
             label: "Status",
             value: (
               <Badge
-                className={getStatusColor(selectedInvoiceForDetails.invoice_status as InvoiceStatus)}
+                className={getStatusColor(
+                  selectedInvoiceForDetails.invoice_status as InvoiceStatus
+                )}
               >
                 {selectedInvoiceForDetails.invoice_status}
               </Badge>
@@ -199,7 +204,10 @@ export function Invoice() {
               selectedInvoiceForDetails.invoice_currency
             ),
           },
-          { label: "Currency", value: selectedInvoiceForDetails.invoice_currency },
+          {
+            label: "Currency",
+            value: selectedInvoiceForDetails.invoice_currency,
+          },
           {
             label: "Withholding Tax",
             value: selectedInvoiceForDetails.wht_applicable
@@ -227,7 +235,9 @@ export function Invoice() {
                 },
                 {
                   label: "Contract",
-                  value: selectedInvoiceForDetails.purchase_order.contract?.job_title || "N/A",
+                  value:
+                    selectedInvoiceForDetails.purchase_order.contract_id ||
+                    "N/A",
                 },
               ],
             },
@@ -244,11 +254,12 @@ export function Invoice() {
                 },
                 {
                   label: "CWO Status",
-                  value: selectedInvoiceForDetails.calloff_work_order.CWO_status,
+                  value:
+                    selectedInvoiceForDetails.calloff_work_order.CWO_status,
                 },
                 {
                   label: "Contract",
-                  value: selectedInvoiceForDetails.calloff_work_order.contract?.job_title || "N/A",
+                  value: "N/A",
                 },
               ],
             },
@@ -300,7 +311,9 @@ export function Invoice() {
       cell: ({ row }) => {
         const value = row.getValue("invoice_total_value");
         const currency = row.original.invoice_currency;
-        return <div className="font-mono">{formatCurrency(value, currency)}</div>;
+        return (
+          <div className="font-mono">{formatCurrency(value, currency)}</div>
+        );
       },
     },
     {
@@ -365,9 +378,7 @@ export function Invoice() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <h1 className="text-xl sm:text-2xl font-semibold">
-        Invoice Management
-      </h1>
+      <h1 className="text-xl sm:text-2xl font-semibold">Invoice Management</h1>
       <div className="flex flex-wrap justify-between items-center gap-2">
         <div className="relative flex flex-1 items-center gap-2">
           <Button
@@ -383,8 +394,8 @@ export function Invoice() {
             size="sm"
             className="w-full sm:w-auto"
             onClick={() => document.getElementById("csv-upload")?.click()}
-          ></Button>
-            <Upload className="mr-2 h-4 w-4" >
+          >
+            <Upload className="mr-2 h-4 w-4" />
             Upload CSV
           </Button>
           <input
