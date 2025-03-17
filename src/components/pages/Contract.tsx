@@ -5,6 +5,8 @@ import {
   useContracts,
   useDeleteContract,
   useCreateContract,
+  useSearchFilter,
+  useParseContractCsv,
 } from "@/hooks/useContracts";
 import { DataTable } from "@/components/dataTable/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
@@ -13,64 +15,57 @@ import { Plus, Search, Pencil, Trash2, Upload, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ContractForm } from "@/components/forms/Contract";
 import { Badge } from "@/components/ui/badge";
-import type { Contract as ContractType } from "@/types/Contract";
+import type { ContractView } from "@/types/Contract";
 import { toast } from "sonner";
-import { parseContract } from "@/lib/csv/contract";
+import { CSVPreviewDialog } from "@/components/reusableModels/CSVPreviewDialog";
+import { DeleteConfirmationDialog } from "@/components/reusableModels/DeleteConfirmationDialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { ContractDetails } from "@/components/detailsDialogs/Contract";
-import { CSVPreviewDialog } from "@/components/csvPreviewDialog/Contract";
-import { tryCatch } from "@/lib/utils";
+  DetailsDialog,
+  DetailSection,
+} from "@/components/reusableModels/DetailsDialog";
 
 export function Contract() {
-  const { data: contracts = [], isLoading } = useContracts();
+  // Core data fetching hook
+  const { data: contracts = [], isLoading, refetch } = useContracts();
   const deleteContract = useDeleteContract();
   const createContract = useCreateContract();
+  const parseCSV = useParseContractCsv();
 
+  // Page-level state management
   const [searchTerm, setSearchTerm] = useState("");
-  const filteredData = contracts.filter(
-    (contract) =>
-      contract.job_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contract.job_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (contract.contractor?.last_name || "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      (contract.client_company?.client_name || "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase())
-  );
 
+  // Form dialog state
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedContractId, setSelectedContractId] = useState<string | null>(
-    null
-  );
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [contractToDelete, setContractToDelete] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedContractId, setSelectedContractId] = useState<string>();
 
+  // Details dialog state
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [selectedContractForDetails, setSelectedContractForDetails] = useState<
-    ContractType | undefined
+    ContractView | undefined
   >(undefined);
 
-  // CSV upload state
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [csvData, setCsvData] = useState<Partial<ContractType>[]>([]);
-  const [csvFileName, setCsvFileName] = useState("");
-  const [validationErrors, setValidationErrors] = useState<
+  // CSV dialog state
+  const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvValidationErrors, setCsvValidationErrors] = useState<
     { row: number; error: string }[]
   >([]);
 
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [contractToDelete, setContractToDelete] = useState<string | null>(null);
+
+  // Filter data based on search term
+  const filteredData = useSearchFilter<ContractView>(contracts, searchTerm, [
+    "job_title",
+    "job_number",
+    "contract_id",
+  ]);
+
+  // Simple handlers for UI actions
   const handleAddClick = () => {
-    setSelectedContractId(null);
+    setSelectedContractId(undefined);
     setIsFormDialogOpen(true);
   };
 
@@ -79,7 +74,7 @@ export function Contract() {
     setIsFormDialogOpen(true);
   };
 
-  const handleDetailsClick = (contract: ContractType) => {
+  const handleDetailsClick = (contract: ContractView) => {
     setSelectedContractForDetails(contract);
     setIsDetailsDialogOpen(true);
   };
@@ -89,64 +84,54 @@ export function Contract() {
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!contractToDelete) return;
-
-    setIsDeleting(true);
-    const { error } = await tryCatch(() =>
-      deleteContract.mutateAsync(contractToDelete)
-    );
-
-    if (error) {
-      toast.error("Failed to delete contract: " + error.message);
-    } else {
-      toast.success("Contract deleted successfully");
-    }
-
-    setIsDeleting(false);
-    setDeleteDialogOpen(false);
-    setContractToDelete(null);
-  };
-
-  const handleFileUpload = async (
+  const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      setUploadFile(file);
 
-    const { data, error } = await tryCatch(() => parseContract(file));
+      const result = await parseCSV(file);
+      if (result.data) {
+        setCsvData(result.data.data);
+        setCsvValidationErrors(result.data.errors);
+        setIsCSVDialogOpen(true);
+      } else if (result.error) {
+        toast.error(`Failed to parse CSV: ${result.error.message}`);
+      }
 
-    if (error) {
-      toast.error("Failed to parse CSV file: " + error.message);
-      return;
+      event.target.value = "";
     }
-
-    if (data) {
-      setCsvFileName(file.name);
-      setCsvData(data.data);
-      setValidationErrors(data.errors || []);
-      setIsPreviewOpen(true);
-    }
-
-    event.target.value = "";
   };
 
-  const handleConfirmCsvUpload = async () => {
-    if (validationErrors.length > 0) {
-      toast.error("Please fix validation errors before uploading");
-      return Promise.reject(new Error("Validation errors exist"));
+  const handleCSVDialogClose = () => {
+    setIsCSVDialogOpen(false);
+    setCsvData([]);
+    setCsvValidationErrors([]);
+    setUploadFile(null);
+  };
+
+  const handleCsvUpload = async () => {
+    if (!csvData.length) return;
+
+    try {
+      await createContract.mutateAsync(csvData);
+      toast.success(`Successfully imported ${csvData.length} contracts`);
+      refetch();
+      setIsCSVDialogOpen(false);
+      setCsvData([]);
+      setCsvValidationErrors([]);
+      setUploadFile(null);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to import contracts: ${errorMessage}`);
     }
+  };
 
-    const { error } = await tryCatch(() => createContract.mutateAsync(csvData));
-
-    if (error) {
-      toast.error("Failed to import contracts from CSV: " + error.message);
-      return Promise.reject(error);
-    }
-
-    toast.success(`Successfully imported ${csvData.length} contracts`);
-    setIsPreviewOpen(false);
-    return Promise.resolve();
+  const handleFormSuccess = () => {
+    refetch();
+    setIsFormDialogOpen(false);
   };
 
   const formatDate = (date: Date) => {
@@ -157,7 +142,63 @@ export function Contract() {
     });
   };
 
-  const columns: ColumnDef<ContractType>[] = [
+  const getContractDetailSections = (): DetailSection[] => {
+    if (!selectedContractForDetails) return [];
+
+    return [
+      {
+        title: "Contract Information",
+        items: [
+          {
+            label: "Contract ID",
+            value: selectedContractForDetails.contract_id,
+          },
+          { label: "Job Title", value: selectedContractForDetails.job_title },
+          { label: "Job Number", value: selectedContractForDetails.job_number },
+          { label: "Job Type", value: selectedContractForDetails.job_type },
+          {
+            label: "Contract Start Date",
+            value: formatDate(selectedContractForDetails.contract_start_date),
+          },
+          {
+            label: "Contract End Date",
+            value: formatDate(selectedContractForDetails.contract_end_date),
+          },
+          {
+            label: "Contract Status",
+            value: selectedContractForDetails.contract_status,
+          },
+          {
+            label: "Kintec Cost Centre Code",
+            value: selectedContractForDetails.kintec_cost_centre_code,
+          },
+          {
+            label: "Description of Services",
+            value: selectedContractForDetails.description_of_services || "N/A",
+          },
+        ],
+      },
+      {
+        title: "Client & Contractor Information",
+        items: [
+          {
+            label: "Contractor",
+            value: selectedContractForDetails.contractor
+              ? `${selectedContractForDetails.contractor.first_name} ${selectedContractForDetails.contractor.last_name}`
+              : "N/A",
+          },
+          {
+            label: "Client Company",
+            value: selectedContractForDetails.client_company
+              ? selectedContractForDetails.client_company.client_name
+              : "N/A",
+          },
+        ],
+      },
+    ];
+  };
+
+  const columns: ColumnDef<ContractView>[] = [
     {
       accessorKey: "job_title",
       header: () => <div className="text-center">Job Title</div>,
@@ -296,7 +337,7 @@ export function Contract() {
           <input
             type="file"
             accept=".csv"
-            onChange={handleFileUpload}
+            onChange={handleFileChange}
             className="hidden"
             id="csv-upload"
           />
@@ -323,68 +364,47 @@ export function Contract() {
 
       {/* Add/Edit Form Dialog */}
       <ContractForm
-        contractId={selectedContractId || undefined}
+        contractId={selectedContractId}
         open={isFormDialogOpen}
-        onClose={() => {
-          setIsFormDialogOpen(false);
-        }}
+        onClose={() => setIsFormDialogOpen(false)}
+        onSuccess={handleFormSuccess}
       />
 
       {/* Details Dialog */}
-      <ContractDetails
-        contract={selectedContractForDetails}
-        open={isDetailsDialogOpen}
-        onClose={() => setIsDetailsDialogOpen(false)}
-      />
+      {selectedContractForDetails && (
+        <DetailsDialog
+          title={`Contract - ${selectedContractForDetails.job_title}`}
+          open={isDetailsDialogOpen}
+          onClose={() => setIsDetailsDialogOpen(false)}
+          sections={getContractDetailSections()}
+        />
+      )}
 
       {/* CSV Preview Dialog */}
-      <CSVPreviewDialog
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        data={csvData}
-        fileName={csvFileName}
-        onConfirm={handleConfirmCsvUpload}
-        validationErrors={validationErrors}
-      />
+      {uploadFile && (
+        <CSVPreviewDialog
+          isOpen={isCSVDialogOpen}
+          onClose={handleCSVDialogClose}
+          data={csvData}
+          fileName={uploadFile.name}
+          onConfirm={handleCsvUpload}
+          validationErrors={csvValidationErrors}
+          title="Import Contracts"
+          description="Review contract data before import"
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog
+      <DeleteConfirmationDialog
         open={deleteDialogOpen}
-        onOpenChange={(open) => {
-          if (!isDeleting && !open) {
-            setDeleteDialogOpen(false);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              contract and remove all related data.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-            <AlertDialogCancel className="mt-2 sm:mt-0" disabled={isDeleting}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
-                  Deleting...
-                </>
-              ) : (
-                "Delete"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onClose={() => setDeleteDialogOpen(false)}
+        onDelete={deleteContract.mutateAsync}
+        itemId={contractToDelete}
+        title="Delete Contract"
+        description="Are you sure you want to delete this contract? This action cannot be undone."
+        successMessage="Contract deleted successfully"
+        errorMessage="Failed to delete contract"
+      />
     </div>
   );
 }

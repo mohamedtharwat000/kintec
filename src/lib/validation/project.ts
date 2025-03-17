@@ -8,15 +8,13 @@ export const projectSchema = z.object({
 
 export type ProjectValidation = z.infer<typeof projectSchema>;
 
-export function validateProjects(data: Partial<Project>[]): {
-  validationErrors: { row: number; error: string }[];
-  validData: Partial<Project>[];
-} {
+export function validateProjects(
+  data: Partial<Project>[]
+): { row: number; error: string }[] {
   const validationErrors: { row: number; error: string }[] = [];
-  const validData: Partial<Project>[] = [];
 
   data.forEach((row, index) => {
-    const rowNumber = index + 2; // +2 because of header row and 0-based index
+    const rowNumber = index + 2;
     const result = projectSchema.safeParse(row);
 
     if (!result.success) {
@@ -26,10 +24,8 @@ export function validateProjects(data: Partial<Project>[]): {
           error: `${err.path}: ${err.message}`,
         });
       });
-    } else {
-      validData.push(row);
     }
   });
 
-  return { validationErrors, validData };
+  return validationErrors;
 }

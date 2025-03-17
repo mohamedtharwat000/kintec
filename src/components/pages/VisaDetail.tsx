@@ -5,6 +5,8 @@ import {
   useVisaDetails,
   useDeleteVisaDetail,
   useCreateVisaDetail,
+  useParseVisaDetailCsv,
+  useSearchFilter,
 } from "@/hooks/useVisaDetail";
 import { useContractors } from "@/hooks/useContractor";
 import { DataTable } from "@/components/dataTable/DataTable";
@@ -13,55 +15,68 @@ import { Button } from "@/components/ui/button";
 import { Plus, Search, Pencil, Trash2, Upload, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { VisaDetailForm } from "@/components/forms/VisaDetailForm";
-import { VisaDetailDetails } from "@/components/detailsDialogs/VisaDetailDetails";
-import { CSVPreviewDialog } from "@/components/csvPreviewDialog/VisaDetails";
+import { CSVPreviewDialog } from "@/components/reusableModels/CSVPreviewDialog";
+import { DeleteConfirmationDialog } from "@/components/reusableModels/DeleteConfirmationDialog";
 import { Badge } from "@/components/ui/badge";
-import { parseVisaDetail } from "@/lib/csv/visaDetail";
 import { tryCatch } from "@/lib/utils";
 import type { VisaDetail as VisaDetailType } from "@/types/VisaDetail";
+import {
+  DetailsDialog,
+  DetailSection,
+} from "@/components/reusableModels/DetailsDialog";
 
 export function VisaDetail() {
-  const { data: visaDetails = [], isLoading } = useVisaDetails();
+  // Core data fetching hook
+  const { data: visaDetails = [], isLoading, refetch } = useVisaDetails();
   const { data: contractors = [] } = useContractors();
   const deleteVisaDetail = useDeleteVisaDetail();
   const createVisaDetail = useCreateVisaDetail();
+  const parseCSV = useParseVisaDetailCsv();
 
+  // Page-level state management
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Form dialog state
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedVisaDetailId, setSelectedVisaDetailId] = useState<
-    string | null
-  >(null);
+  const [selectedVisaDetailId, setSelectedVisaDetailId] = useState<string>();
+
+  // Details dialog state
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [selectedDetailForDetails, setSelectedDetailForDetails] = useState<
+    VisaDetailType | undefined
+  >(undefined);
+
+  // CSV dialog state
+  const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvValidationErrors, setCsvValidationErrors] = useState<
+    { row: number; error: string }[]
+  >([]);
+
+  // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [visaDetailToDelete, setVisaDetailToDelete] = useState<string | null>(
     null
   );
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
-  const [selectedDetail, setSelectedDetail] = useState<
-    VisaDetailType | undefined
-  >(undefined);
 
-  // CSV upload state
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [csvData, setCsvData] = useState<Partial<VisaDetailType>[]>([]);
-  const [csvFileName, setCsvFileName] = useState("");
-  const [validationErrors, setValidationErrors] = useState<
-    { row: number; error: string }[]
-  >([]);
+  // Filter data based on search term
+  const filteredData = useSearchFilter<VisaDetailType>(
+    visaDetails,
+    searchTerm,
+    [
+      "visa_number",
+      "visa_type",
+      "visa_country",
+      "visa_detail_id",
+      "contractor_id",
+    ]
+  );
 
+  // Simple handlers for UI actions
   const handleAddClick = () => {
-    setSelectedVisaDetailId(null);
+    setSelectedVisaDetailId(undefined);
     setIsFormDialogOpen(true);
   };
 
@@ -70,9 +85,9 @@ export function VisaDetail() {
     setIsFormDialogOpen(true);
   };
 
-  const handleViewDetails = (visaDetail: VisaDetailType) => {
-    setSelectedDetail(visaDetail);
-    setViewDetailsOpen(true);
+  const handleDetailsClick = (visaDetail: VisaDetailType) => {
+    setSelectedDetailForDetails(visaDetail);
+    setIsDetailsDialogOpen(true);
   };
 
   const handleDeleteClick = (visaDetailId: string) => {
@@ -80,67 +95,54 @@ export function VisaDetail() {
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!visaDetailToDelete) return;
-
-    setIsDeleting(true);
-    const { error } = await tryCatch(() =>
-      deleteVisaDetail.mutateAsync(visaDetailToDelete)
-    );
-
-    if (error) {
-      toast.error("Failed to delete visa detail: " + error.message);
-    } else {
-      toast.success("Visa detail deleted successfully");
-    }
-
-    setIsDeleting(false);
-    setDeleteDialogOpen(false);
-    setVisaDetailToDelete(null);
-  };
-
-  const handleFileUpload = async (
+  const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      setUploadFile(file);
 
-    const { data, error } = await tryCatch(() => parseVisaDetail(file));
+      const result = await parseCSV(file);
+      if (result.data) {
+        setCsvData(result.data.data);
+        setCsvValidationErrors(result.data.errors || []);
+        setIsCSVDialogOpen(true);
+      } else if (result.error) {
+        toast.error(`Failed to parse CSV: ${result.error.message}`);
+      }
 
-    if (error) {
-      toast.error("Failed to parse CSV file: " + error.message);
       event.target.value = "";
-      return;
     }
-
-    if (data) {
-      setCsvFileName(file.name);
-      setCsvData(data.data);
-      setValidationErrors(data.errors || []);
-      setIsPreviewOpen(true);
-    }
-
-    event.target.value = "";
   };
 
-  const handleConfirmCsvUpload = async () => {
-    if (validationErrors.length > 0) {
-      toast.error("Please fix validation errors before uploading");
-      return;
-    }
+  const handleCSVDialogClose = () => {
+    setIsCSVDialogOpen(false);
+    setCsvData([]);
+    setCsvValidationErrors([]);
+    setUploadFile(null);
+  };
 
-    const { error } = await tryCatch(() =>
-      createVisaDetail.mutateAsync(csvData)
-    );
+  const handleCsvUpload = async () => {
+    if (!csvData.length) return;
 
-    if (error) {
-      toast.error("Failed to import visa details: " + error.message);
-    } else {
+    try {
+      await createVisaDetail.mutateAsync(csvData);
       toast.success(`Successfully imported ${csvData.length} visa details`);
-      setIsPreviewOpen(false);
+      refetch();
+      setIsCSVDialogOpen(false);
       setCsvData([]);
-      setCsvFileName("");
+      setCsvValidationErrors([]);
+      setUploadFile(null);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to import visa details: ${errorMessage}`);
     }
+  };
+
+  const handleFormSuccess = () => {
+    refetch();
+    setIsFormDialogOpen(false);
   };
 
   const getContractorName = (contractorId: string) => {
@@ -150,6 +152,59 @@ export function VisaDetail() {
     return contractor
       ? `${contractor.first_name} ${contractor.last_name}`
       : "Unknown";
+  };
+
+  const getVisaDetailSections = (): DetailSection[] => {
+    if (!selectedDetailForDetails) return [];
+
+    return [
+      {
+        title: "Visa Information",
+        items: [
+          { label: "ID", value: selectedDetailForDetails.visa_detail_id },
+          { label: "Visa Number", value: selectedDetailForDetails.visa_number },
+          { label: "Visa Type", value: selectedDetailForDetails.visa_type },
+          {
+            label: "Visa Country",
+            value: selectedDetailForDetails.visa_country,
+          },
+          {
+            label: "Visa Expiry Date",
+            value: new Date(
+              selectedDetailForDetails.visa_expiry_date
+            ).toLocaleString(),
+          },
+          { label: "Visa Status", value: selectedDetailForDetails.visa_status },
+          {
+            label: "Visa Sponsor",
+            value: selectedDetailForDetails.visa_sponsor,
+          },
+        ],
+      },
+      {
+        title: "Country ID Information",
+        items: [
+          {
+            label: "Country ID Number",
+            value: selectedDetailForDetails.country_id_number,
+          },
+          {
+            label: "Country ID Type",
+            value: selectedDetailForDetails.country_id_type,
+          },
+          {
+            label: "Country ID Expiry Date",
+            value: new Date(
+              selectedDetailForDetails.country_id_expiry_date
+            ).toLocaleString(),
+          },
+          {
+            label: "Country ID Status",
+            value: selectedDetailForDetails.country_id_status,
+          },
+        ],
+      },
+    ];
   };
 
   const columns: ColumnDef<VisaDetailType>[] = [
@@ -192,8 +247,8 @@ export function VisaDetail() {
                 status === "active"
                   ? "default"
                   : status === "expired"
-                  ? "secondary"
-                  : "destructive"
+                    ? "secondary"
+                    : "destructive"
               }
             >
               {String(status)}
@@ -225,7 +280,7 @@ export function VisaDetail() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => handleViewDetails(row.original)}
+              onClick={() => handleDetailsClick(row.original)}
             >
               <Info className="h-4 w-4" />
             </Button>
@@ -234,17 +289,6 @@ export function VisaDetail() {
       },
     },
   ];
-
-  const filteredData = visaDetails.filter(
-    (detail) =>
-      detail.visa_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      detail.visa_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      detail.visa_country?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      detail.visa_detail_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      getContractorName(detail.contractor_id)
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase())
-  );
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -273,7 +317,7 @@ export function VisaDetail() {
           <input
             type="file"
             accept=".csv"
-            onChange={handleFileUpload}
+            onChange={handleFileChange}
             className="hidden"
             id="csv-upload"
           />
@@ -300,69 +344,47 @@ export function VisaDetail() {
 
       {/* Add/Edit Form Dialog */}
       <VisaDetailForm
-        visaDetailId={selectedVisaDetailId || undefined}
+        visaDetailId={selectedVisaDetailId}
         open={isFormDialogOpen}
         onClose={() => setIsFormDialogOpen(false)}
+        onSuccess={handleFormSuccess}
       />
 
       {/* Details Dialog */}
-      {selectedDetail && (
-        <VisaDetailDetails
-          visaDetail={selectedDetail}
-          open={viewDetailsOpen}
-          onClose={() => setViewDetailsOpen(false)}
+      {selectedDetailForDetails && (
+        <DetailsDialog
+          title={`Visa Detail - ${selectedDetailForDetails.visa_number}`}
+          open={isDetailsDialogOpen}
+          onClose={() => setIsDetailsDialogOpen(false)}
+          sections={getVisaDetailSections()}
         />
       )}
 
       {/* CSV Preview Dialog */}
-      <CSVPreviewDialog
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        data={csvData}
-        fileName={csvFileName}
-        onConfirm={handleConfirmCsvUpload}
-        validationErrors={validationErrors}
-        title="Preview Visa Details CSV Data"
-      />
+      {uploadFile && (
+        <CSVPreviewDialog
+          isOpen={isCSVDialogOpen}
+          onClose={handleCSVDialogClose}
+          data={csvData}
+          fileName={uploadFile.name}
+          onConfirm={handleCsvUpload}
+          validationErrors={csvValidationErrors}
+          title="Import Visa Details"
+          description="Review visa details data before import"
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog
+      <DeleteConfirmationDialog
         open={deleteDialogOpen}
-        onOpenChange={(open) => {
-          if (!isDeleting && !open) {
-            setDeleteDialogOpen(false);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              visa detail and may affect contractor information.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-            <AlertDialogCancel className="mt-2 sm:mt-0" disabled={isDeleting}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
-                  Deleting...
-                </>
-              ) : (
-                "Delete"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onClose={() => setDeleteDialogOpen(false)}
+        onDelete={deleteVisaDetail.mutateAsync}
+        itemId={visaDetailToDelete}
+        title="Delete Visa Detail"
+        description="Are you sure you want to delete this visa detail? This action cannot be undone and may affect contractor information."
+        successMessage="Visa detail deleted successfully"
+        errorMessage="Failed to delete visa detail"
+      />
     </div>
   );
 }

@@ -5,59 +5,66 @@ import {
   useProjects,
   useDeleteProject,
   useCreateProject,
+  useParseProjectCsv,
+  useSearchFilter,
 } from "@/hooks/useProjects";
 import { DataTable } from "@/components/dataTable/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Plus, Search, Pencil, Trash2, Upload, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
-import { Project as ProjectType } from "@/types/Project";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { ProjectForm } from "@/components/forms/Project";
-import { ProjectDetails } from "@/components/detailsDialogs/Project";
-import { CSVPreviewDialog } from "@/components/csvPreviewDialog/Project";
-import { parseProject } from "@/lib/csv/project";
-import { tryCatch } from "@/lib/utils";
+import { Project as ProjectType } from "@/types/Project";
+import { CSVPreviewDialog } from "@/components/reusableModels/CSVPreviewDialog";
+import { DeleteConfirmationDialog } from "@/components/reusableModels/DeleteConfirmationDialog";
+import { toast } from "sonner";
+import {
+  DetailsDialog,
+  DetailSection,
+} from "@/components/reusableModels/DetailsDialog";
 
 export function Project() {
-  const { data: projects = [], isLoading } = useProjects();
+  // Core data fetching hook
+  const { data: projects = [], isLoading, refetch } = useProjects();
   const deleteProject = useDeleteProject();
   const createProject = useCreateProject();
+  const parseCSV = useParseProjectCsv();
 
+  // Page-level state management
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Form dialog state
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    null
-  );
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>();
 
+  // Details dialog state
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<ProjectType | null>(
-    null
-  );
+  const [selectedProjectForDetails, setSelectedProjectForDetails] = useState<
+    ProjectType | undefined
+  >(undefined);
 
-  // CSV upload state
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [csvData, setCsvData] = useState<Partial<ProjectType>[]>([]);
-  const [csvFileName, setCsvFileName] = useState("");
-  const [validationErrors, setValidationErrors] = useState<
+  // CSV dialog state
+  const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvValidationErrors, setCsvValidationErrors] = useState<
     { row: number; error: string }[]
   >([]);
 
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+
+  // Filter data based on search term
+  const filteredData = useSearchFilter<ProjectType>(projects, searchTerm, [
+    "project_name",
+    "project_type",
+    "project_id",
+  ]);
+
+  // Simple handlers for UI actions
   const handleAddClick = () => {
-    setSelectedProjectId(null);
+    setSelectedProjectId(undefined);
     setIsFormDialogOpen(true);
   };
 
@@ -66,8 +73,8 @@ export function Project() {
     setIsFormDialogOpen(true);
   };
 
-  const handleViewDetails = (project: ProjectType) => {
-    setSelectedProject(project);
+  const handleDetailsClick = (project: ProjectType) => {
+    setSelectedProjectForDetails(project);
     setIsDetailsDialogOpen(true);
   };
 
@@ -76,104 +83,101 @@ export function Project() {
     setDeleteDialogOpen(true);
   };
 
-  const handleFormClose = () => {
-    setIsFormDialogOpen(false);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!projectToDelete) return;
-
-    setIsDeleting(true);
-    const { error } = await tryCatch(() =>
-      deleteProject.mutateAsync(projectToDelete)
-    );
-
-    if (error) {
-      toast.error("Failed to delete project: " + error.message);
-    } else {
-      toast.success("Project deleted successfully");
-    }
-
-    setIsDeleting(false);
-    setDeleteDialogOpen(false);
-    setProjectToDelete(null);
-  };
-
-  const handleFileUpload = async (
+  const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      setUploadFile(file);
 
-    try {
-      // Parse CSV file using the dedicated parser
-      const result = await parseProject(file);
+      const result = await parseCSV(file);
+      if (result.data) {
+        setCsvData(result.data.data);
+        setCsvValidationErrors(result.data.errors || []);
+        setIsCSVDialogOpen(true);
+      } else if (result.error) {
+        toast.error(`Failed to parse CSV: ${result.error.message}`);
+      }
 
-      setCsvFileName(file.name);
-      setCsvData(result.data);
-      setValidationErrors(result.errors || []);
-
-      // Show preview dialog
-      setIsPreviewOpen(true);
-    } catch (error) {
-      console.error("Error parsing CSV:", error);
-      toast.error("Failed to parse CSV file");
-    } finally {
-      // Reset the file input
       event.target.value = "";
     }
   };
 
-  const handleConfirmCsvUpload = async () => {
-    if (validationErrors.length > 0) {
-      toast.error("Please fix validation errors before uploading");
-      return Promise.reject("Validation errors present");
-    }
+  const handleCSVDialogClose = () => {
+    setIsCSVDialogOpen(false);
+    setCsvData([]);
+    setCsvValidationErrors([]);
+    setUploadFile(null);
+  };
 
-    const { error } = await tryCatch(() => createProject.mutateAsync(csvData));
+  const handleCsvUpload = async () => {
+    if (!csvData.length) return;
 
-    if (error) {
-      toast.error("Failed to import projects from CSV: " + error.message);
-      return Promise.reject(error);
-    } else {
+    try {
+      await createProject.mutateAsync(csvData);
       toast.success(`Successfully imported ${csvData.length} projects`);
-      setIsPreviewOpen(false);
+      refetch();
+      setIsCSVDialogOpen(false);
       setCsvData([]);
-      return Promise.resolve();
+      setCsvValidationErrors([]);
+      setUploadFile(null);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to import projects: ${errorMessage}`);
     }
   };
 
-  const filteredData = projects.filter(
-    (project) =>
-      project.project_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.project_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.project_id?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleFormSuccess = () => {
+    refetch();
+    setIsFormDialogOpen(false);
+  };
+
+  const getProjectDetailSections = (): DetailSection[] => {
+    if (!selectedProjectForDetails) return [];
+
+    return [
+      {
+        title: "Project Information",
+        items: [
+          { label: "Project ID", value: selectedProjectForDetails.project_id },
+          {
+            label: "Project Name",
+            value: selectedProjectForDetails.project_name,
+          },
+          {
+            label: "Project Type",
+            value: selectedProjectForDetails.project_type,
+          },
+        ],
+      },
+    ];
+  };
 
   const columns: ColumnDef<ProjectType>[] = [
     {
       accessorKey: "project_id",
       header: () => <div className="text-center">Project ID</div>,
       cell: ({ row }) => (
-        <div className="font-mono text-xs truncate !max-w-[100px] md:max-w-none">
+        <div className="font-medium text-center truncate max-w-[120px] md:max-w-none">
           {row.getValue("project_id")}
         </div>
       ),
     },
     {
       accessorKey: "project_name",
-      header: () => <div className="text-center">Project Name</div>,
+      header: () => <div className="text-center">Name</div>,
       cell: ({ row }) => (
-        <div className="font-medium truncate max-w-[120px] md:max-w-none">
+        <div className="font-medium text-center truncate max-w-[120px] md:max-w-none">
           {row.getValue("project_name")}
         </div>
       ),
     },
     {
       accessorKey: "project_type",
-      header: () => <div className="text-center">Project Type</div>,
+      header: () => <div className="text-center">Type</div>,
       cell: ({ row }) => (
-        <div className="truncate max-w-[150px] md:max-w-none">
+        <div className="text-center truncate max-w-[120px] md:max-w-none">
           {row.getValue("project_type")}
         </div>
       ),
@@ -201,7 +205,7 @@ export function Project() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => handleViewDetails(row.original)}
+              onClick={() => handleDetailsClick(row.original)}
             >
               <Info className="h-4 w-4" />
             </Button>
@@ -213,7 +217,7 @@ export function Project() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <h1 className="text-xl sm:text-2xl font-semibold">Projects</h1>
+      <h1 className="text-xl sm:text-2xl font-semibold">Project Master Data</h1>
       <div className="flex flex-wrap justify-between items-center gap-2">
         <div className="relative flex flex-1 items-center gap-2">
           <Button
@@ -236,7 +240,7 @@ export function Project() {
           <input
             type="file"
             accept=".csv"
-            onChange={handleFileUpload}
+            onChange={handleFileChange}
             className="hidden"
             id="csv-upload"
           />
@@ -263,68 +267,47 @@ export function Project() {
 
       {/* Add/Edit Form Dialog */}
       <ProjectForm
-        projectId={selectedProjectId || undefined}
+        projectId={selectedProjectId}
         open={isFormDialogOpen}
-        onClose={handleFormClose}
+        onClose={() => setIsFormDialogOpen(false)}
+        onSuccess={handleFormSuccess}
       />
 
       {/* Details Dialog */}
-      {isDetailsDialogOpen && selectedProject && (
-        <ProjectDetails
-          project={selectedProject}
+      {selectedProjectForDetails && (
+        <DetailsDialog
+          title={`Project - ${selectedProjectForDetails.project_name}`}
           open={isDetailsDialogOpen}
           onClose={() => setIsDetailsDialogOpen(false)}
+          sections={getProjectDetailSections()}
         />
       )}
 
       {/* CSV Preview Dialog */}
-      <CSVPreviewDialog
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        data={csvData}
-        fileName={csvFileName}
-        onConfirm={handleConfirmCsvUpload}
-        validationErrors={validationErrors}
-      />
+      {uploadFile && (
+        <CSVPreviewDialog
+          isOpen={isCSVDialogOpen}
+          onClose={handleCSVDialogClose}
+          data={csvData}
+          fileName={uploadFile.name}
+          onConfirm={handleCsvUpload}
+          validationErrors={csvValidationErrors}
+          title="Import Projects"
+          description="Review project data before import"
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog
+      <DeleteConfirmationDialog
         open={deleteDialogOpen}
-        onOpenChange={(open) => {
-          if (!isDeleting && !open) {
-            setDeleteDialogOpen(false);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              project and may affect related contracts and rules.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-            <AlertDialogCancel className="mt-2 sm:mt-0" disabled={isDeleting}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
-                  Deleting...
-                </>
-              ) : (
-                "Delete"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onClose={() => setDeleteDialogOpen(false)}
+        onDelete={deleteProject.mutateAsync}
+        itemId={projectToDelete}
+        title="Delete Project"
+        description="Are you sure you want to delete this project? This action cannot be undone."
+        successMessage="Project deleted successfully"
+        errorMessage="Failed to delete project"
+      />
     </div>
   );
 }

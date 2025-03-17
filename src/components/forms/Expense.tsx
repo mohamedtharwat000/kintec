@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/form";
 import { usePurchaseOrders } from "@/hooks/usePurchaseOrders";
 import { useCalloffWorkOrders } from "@/hooks/useCalloffWorkOrders";
+import { tryCatch } from "@/lib/utils";
 
 const formSchema = z
   .object({
@@ -111,16 +112,33 @@ export function ExpenseForm({
     },
   });
 
+  // Safe function to get number value from potential Decimal object
+  const safelyGetNumber = (value: any): number => {
+    if (typeof value === "number") return value;
+    if (value === null || value === undefined) return 0;
+    // Handle Decimal objects from Prisma
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "toNumber" in value &&
+      typeof value.toNumber === "function"
+    ) {
+      return value.toNumber();
+    }
+    return Number(value) || 0;
+  };
+
   useEffect(() => {
     if (isEditing && existingExpense) {
       form.reset({
-        expense_type: existingExpense.expense_type,
-        expense_frequency: existingExpense.expense_frequency,
-        expense_value: Number(existingExpense.expense_value),
+        expense_type: existingExpense.expense_type as ExpenseType,
+        expense_frequency:
+          existingExpense.expense_frequency as ExpenseFrequency,
+        expense_value: safelyGetNumber(existingExpense.expense_value),
         expsense_currency: existingExpense.expsense_currency,
         pro_rata_percentage: existingExpense.pro_rata_percentage,
-        PO_id: existingExpense.PO_id,
-        CWO_id: existingExpense.CWO_id,
+        PO_id: existingExpense.PO_id || undefined,
+        CWO_id: existingExpense.CWO_id || undefined,
       });
     } else if (!isEditing && open) {
       // Reset form when opening in create mode
@@ -137,14 +155,16 @@ export function ExpenseForm({
   }, [existingExpense, form, isEditing, open]);
 
   const onSubmit = async (data: FormData) => {
-    try {
+    const { error } = await tryCatch(async () => {
       if (isEditing) {
         await updateExpense.mutateAsync({
-          id: expenseId,
+          id: expenseId!,
+          // @ts-ignore - Backend handles conversion of values
           data,
         });
         toast.success("Expense updated successfully");
       } else {
+        // @ts-ignore - Backend handles conversion of values
         await createExpense.mutateAsync(data);
         toast.success("Expense added successfully");
       }
@@ -153,7 +173,9 @@ export function ExpenseForm({
         onSuccess();
       }
       onClose();
-    } catch (error) {
+    });
+
+    if (error) {
       console.error(error);
       toast.error(
         isEditing ? "Failed to update expense" : "Failed to create expense"
@@ -165,8 +187,15 @@ export function ExpenseForm({
   const orderTypeSelected = !!form.watch("PO_id") || !!form.watch("CWO_id");
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!isSubmitting && !open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-[80vw] max-h-[80vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Expense" : "Add New Expense"}
@@ -263,6 +292,9 @@ export function ExpenseForm({
                             step="0.01"
                             className="pl-8"
                             {...field}
+                            onChange={(e) =>
+                              field.onChange(parseFloat(e.target.value))
+                            }
                           />
                         </div>
                       </FormControl>
@@ -299,9 +331,8 @@ export function ExpenseForm({
                             <SelectItem value="AUD">
                               AUD - Australian Dollar
                             </SelectItem>
-                            <SelectItem value="CAD">
-                              CAD - Canadian Dollar
-                            </SelectItem>
+                            <SelectItem value="CAD" />
+                            CAD - Canadian Dollar
                           </SelectContent>
                         </Select>
                       </FormControl>
@@ -325,6 +356,9 @@ export function ExpenseForm({
                           max="100"
                           step="1"
                           {...field}
+                          onChange={(e) =>
+                            field.onChange(parseFloat(e.target.value))
+                          }
                         />
                         <span className="absolute right-3 top-1/2 transform -translate-y-1/2">
                           %
@@ -365,7 +399,7 @@ export function ExpenseForm({
                           <SelectItem value="">None</SelectItem>
                           {purchaseOrders.map((po) => (
                             <SelectItem key={po.PO_id} value={po.PO_id}>
-                              {po.PO_id}
+                              {po.contract?.job_title || po.PO_id}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -403,7 +437,7 @@ export function ExpenseForm({
                           <SelectItem value="">None</SelectItem>
                           {calloffWorkOrders.map((cwo) => (
                             <SelectItem key={cwo.CWO_id} value={cwo.CWO_id}>
-                              {cwo.CWO_id}
+                              {cwo.contract?.job_title || cwo.CWO_id}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -421,7 +455,7 @@ export function ExpenseForm({
                 )}
               </div>
 
-              <DialogFooter className="mt-6">
+              <DialogFooter className="pt-4">
                 <Button
                   variant="outline"
                   onClick={onClose}
@@ -435,11 +469,16 @@ export function ExpenseForm({
                   disabled={isSubmitting || !orderTypeSelected}
                 >
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {isEditing ? "Updating..." : "Saving..."}
+                    </>
                   ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isEditing ? "Update" : "Save"}
+                    </>
                   )}
-                  {isEditing ? "Update" : "Save"}
                 </Button>
               </DialogFooter>
             </form>

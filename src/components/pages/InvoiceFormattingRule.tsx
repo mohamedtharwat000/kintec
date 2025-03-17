@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Search, Pencil, Trash2, Upload, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { InvoiceFormattingRuleForm } from "@/components/forms/InvoiceFormattingRule";
-import { InvoiceFormattingRuleDetails } from "@/components/detailsDialogs/InvoiceFormattingRule";
+import { InvoiceFormattingRuleDetails } from "@/components/000/InvoiceFormattingRule";
 import type { InvoiceFormattingRule } from "@/types/Invoice";
 import { toast } from "sonner";
 import { parseInvoiceFormattingRule } from "@/lib/csv/invoiceFormattingRule";

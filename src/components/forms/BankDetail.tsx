@@ -127,7 +127,7 @@ export function BankDetailForm({
       } else {
         await createBankDetail.mutateAsync({
           ...data,
-          bank_detail_type: data.bank_detail_type as BankDetailType,
+          last_updated: new Date(),
         });
         toast.success("Bank detail added successfully");
       }

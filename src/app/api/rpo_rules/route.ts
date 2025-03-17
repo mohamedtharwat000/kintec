@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import {
   getAllRpoRules,
   createRpoRule,
-  createRpoRules,
 } from "@/services/rpo_rules/RpoRuleService";
+import { APIRPORuleData } from "@/types/PORule";
 
 export async function GET() {
   try {
@@ -20,21 +21,17 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const requestData: APIRPORuleData | APIRPORuleData[] = await request.json();
+    const rpoRules = await createRpoRule(requestData);
 
-    // Check if it's a batch operation
-    if (Array.isArray(body)) {
-      const newRules = await createRpoRules(body);
-      return NextResponse.json(newRules, { status: 201 });
+    return NextResponse.json(rpoRules, { status: 201 });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     } else {
-      const newRule = await createRpoRule(body);
-      return NextResponse.json(newRule, { status: 201 });
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
-  } catch (error: any) {
-    console.error(error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
   }
 }

@@ -10,7 +10,8 @@ export async function GET(
   context: { params: { rate_id: string } }
 ) {
   try {
-    const params = context.params;
+    const params = await context.params;
+
     const rate = await getRateById(params.rate_id);
     if (!rate) {
       return NextResponse.json({ error: "Rate not found" }, { status: 404 });
@@ -30,7 +31,7 @@ export async function PUT(
   context: { params: { rate_id: string } }
 ) {
   try {
-    const params = context.params;
+    const params = await context.params;
     const body = await request.json();
     const updated = await updateRate(params.rate_id, body);
     return NextResponse.json(updated, { status: 200 });
@@ -53,7 +54,7 @@ export async function DELETE(
   context: { params: { rate_id: string } }
 ) {
   try {
-    const params = context.params;
+    const params = await context.params;
     await deleteRate(params.rate_id);
     // 204 responses typically have no body
     return new NextResponse(null, { status: 204 });

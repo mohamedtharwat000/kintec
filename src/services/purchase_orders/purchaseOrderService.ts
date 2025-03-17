@@ -1,34 +1,31 @@
 import { prisma } from "@/lib/prisma";
-import { PO_status } from "@prisma/client";
+import {
+  PurchaseOrder,
+  PurchaseOrderView,
+  APIPurchaseOrderData,
+} from "@/types/PurchaseOrder";
 
-export const createPurchaseOrder = async (data: {
-  PO_id?: string;
-  contract_id: string;
-  PO_start_date: string;
-  PO_end_date: string;
-  PO_total_value: number;
-  PO_status: PO_status;
-  kintec_email_for_remittance: string;
-}) => {
-  return prisma.purchase_order.create({
-    data: {
-      PO_id: data.PO_id || undefined,
-      contract: { connect: { contract_id: data.contract_id } },
-      PO_start_date: new Date(data.PO_start_date),
-      PO_end_date: new Date(data.PO_end_date),
-      PO_total_value: data.PO_total_value,
-      PO_status: data.PO_status,
-      kintec_email_for_remittance: data.kintec_email_for_remittance,
-    },
+export const getAllPurchaseOrders = async (): Promise<PurchaseOrderView[]> => {
+  return prisma.purchase_order.findMany({
     include: {
-      contract: true,
+      contract: {
+        include: {
+          contractor: true,
+          client_company: true,
+        },
+      },
       rates: true,
       RPO_rules: true,
+      invoices: true,
+      expenses: true,
+      submissions: true,
     },
   });
 };
 
-export const getPurchaseOrderById = async (id: string) => {
+export const getPurchaseOrderById = async (
+  id: string
+): Promise<PurchaseOrderView | null> => {
   return prisma.purchase_order.findUnique({
     where: { PO_id: id },
     include: {
@@ -40,57 +37,45 @@ export const getPurchaseOrderById = async (id: string) => {
       },
       rates: true,
       RPO_rules: true,
+      invoices: true,
+      expenses: true,
+      submissions: true,
     },
   });
 };
 
-export const updatePurchaseOrder = async (id: string, data: any) => {
-  const { contract_id, PO_start_date, PO_end_date, ...rest } = data;
-
-  return prisma.purchase_order.update({
-    where: { PO_id: id },
-    data: {
-      ...rest,
-      ...(contract_id && { contract: { connect: { contract_id } } }),
-      ...(PO_start_date && { PO_start_date: new Date(PO_start_date) }),
-      ...(PO_end_date && { PO_end_date: new Date(PO_end_date) }),
-    },
-    include: {
-      contract: true,
-      rates: true,
-      RPO_rules: true,
-    },
-  });
-};
-
-export const deletePurchaseOrder = async (id: string) => {
+export const deletePurchaseOrder = async (
+  id: string
+): Promise<PurchaseOrder> => {
   return prisma.purchase_order.delete({
     where: { PO_id: id },
   });
 };
 
-export const getAllPurchaseOrders = async () => {
-  return prisma.purchase_order.findMany({
-    include: {
-      contract: {
-        include: {
-          contractor: true,
-          client_company: true,
-        },
-      },
-      rates: true,
-      RPO_rules: true,
-    },
+export const updatePurchaseOrder = async (
+  id: string,
+  data: Partial<PurchaseOrder>
+): Promise<PurchaseOrder> => {
+  return prisma.purchase_order.update({
+    where: { PO_id: id },
+    data,
   });
 };
 
-export const getPurchaseOrdersByContractId = async (contractId: string) => {
-  return prisma.purchase_order.findFirst({
-    where: { contract_id: contractId },
-    include: {
-      contract: true,
-      rates: true,
-      RPO_rules: true,
-    },
-  });
+export const createPurchaseOrder = async (
+  data: APIPurchaseOrderData | APIPurchaseOrderData[]
+): Promise<PurchaseOrder[]> => {
+  const receivedData: APIPurchaseOrderData[] = Array.isArray(data)
+    ? data
+    : [data];
+
+  return Promise.all(
+    receivedData.map((purchaseOrder) => {
+      if (purchaseOrder.PO_id === "") purchaseOrder.PO_id = undefined;
+
+      return prisma.purchase_order.create({
+        data: purchaseOrder,
+      });
+    })
+  );
 };

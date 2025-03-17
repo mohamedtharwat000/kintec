@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Save, X, Loader2, CalendarIcon } from "lucide-react";
+import { Save, Loader2, CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -123,7 +123,7 @@ export function ContractForm({
         job_number: existingContract.job_number,
         kintec_cost_centre_code: existingContract.kintec_cost_centre_code,
         description_of_services: existingContract.description_of_services || "",
-        contract_status: existingContract.contract_status,
+        contract_status: existingContract.contract_status as ContractStatus,
       });
     } else if (!isEditing && open) {
       form.reset({
@@ -155,6 +155,7 @@ export function ContractForm({
       } else {
         await createContract.mutateAsync({
           ...data,
+          description_of_services: data.description_of_services || null,
         });
         toast.success("Contract added successfully");
       }

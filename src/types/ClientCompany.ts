@@ -1,9 +1,15 @@
-import { Contract } from "@/types/Contract";
+import { client_company, contract } from "@prisma/client";
 
-export interface ClientCompany {
-  client_company_id: string;
-  client_name: string;
-  contact_email: string;
-  invoice_submission_deadline?: string;
-  contracts?: Contract[];
-}
+export type ClientCompany = client_company;
+
+export type ClientCompanyView = ClientCompany & {
+  contracts?: contract[];
+};
+
+export type MakePropertyOptional<T, K extends keyof T> = Omit<T, K> &
+  Partial<Pick<T, K>>;
+
+export type APIClientCompanyData = MakePropertyOptional<
+  ClientCompany,
+  "client_company_id"
+>;

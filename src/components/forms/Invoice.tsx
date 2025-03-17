@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Save, X, Loader2, CalendarIcon } from "lucide-react";
+import { Save, Loader2, CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -45,8 +45,7 @@ import {
 } from "@/hooks/useInvoices";
 import { usePurchaseOrders } from "@/hooks/usePurchaseOrders";
 import { useCalloffWorkOrders } from "@/hooks/useCalloffWorkOrders";
-
-// You may need to create these hooks if they don't exist yet
+import { tryCatch } from "@/lib/utils";
 
 const formSchema = z
   .object({
@@ -123,8 +122,8 @@ export function InvoiceForm({
     if (isEditing && existingInvoice) {
       form.reset({
         billing_period: new Date(existingInvoice.billing_period),
-        invoice_status: existingInvoice.invoice_status,
-        invoice_type: existingInvoice.invoice_type,
+        invoice_status: existingInvoice.invoice_status as InvoiceStatus,
+        invoice_type: existingInvoice.invoice_type as InvoiceType,
         invoice_currency: existingInvoice.invoice_currency,
         invoice_total_value: parseFloat(
           existingInvoice.invoice_total_value.toString()
@@ -153,23 +152,17 @@ export function InvoiceForm({
   }, [existingInvoice, form, isEditing, open]);
 
   const onSubmit = async (data: FormData) => {
-    try {
+    const { error } = await tryCatch(async () => {
       if (isEditing) {
         await updateInvoice.mutateAsync({
-          id: invoiceId,
-          data: {
-            ...data,
-            billing_period: new Date(data.billing_period.toISOString()),
-            wht_rate: data.wht_rate === null ? undefined : data.wht_rate,
-          },
+          id: invoiceId!,
+          // @ts-ignore
+          data,
         });
         toast.success("Invoice updated successfully");
       } else {
-        await createInvoice.mutateAsync({
-          ...data,
-          billing_period: new Date(data.billing_period),
-          wht_rate: data.wht_rate === null ? undefined : data.wht_rate,
-        });
+        // @ts-ignore
+        await createInvoice.mutateAsync(data);
         toast.success("Invoice added successfully");
       }
 
@@ -177,7 +170,9 @@ export function InvoiceForm({
         onSuccess();
       }
       onClose();
-    } catch (error) {
+    });
+
+    if (error) {
       console.error(error);
       toast.error(
         isEditing ? "Failed to update invoice" : "Failed to create invoice"
@@ -193,8 +188,15 @@ export function InvoiceForm({
   const watchCWOId = form.watch("CWO_id");
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!isSubmitting && !open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-[80vw] max-h-[80vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Invoice" : "Add New Invoice"}
@@ -368,7 +370,10 @@ export function InvoiceForm({
                           <SelectItem value="">None</SelectItem>
                           {purchaseOrders.map((po) => (
                             <SelectItem key={po.PO_id} value={po.PO_id}>
-                              {po.PO_id}
+                              {po.PO_id}{" "}
+                              {po.contract?.job_title
+                                ? `- ${po.contract.job_title}`
+                                : ""}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -398,7 +403,10 @@ export function InvoiceForm({
                           <SelectItem value="">None</SelectItem>
                           {calloffWorkOrders.map((cwo) => (
                             <SelectItem key={cwo.CWO_id} value={cwo.CWO_id}>
-                              {cwo.CWO_id}
+                              {cwo.CWO_id}{" "}
+                              {cwo.contract?.job_title
+                                ? `- ${cwo.contract.job_title}`
+                                : ""}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -488,11 +496,16 @@ export function InvoiceForm({
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {isEditing ? "Updating..." : "Saving..."}
+                    </>
                   ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isEditing ? "Update" : "Save"}
+                    </>
                   )}
-                  {isEditing ? "Update" : "Save"}
                 </Button>
               </DialogFooter>
             </form>

@@ -1,118 +1,33 @@
 import axiosClient from "@/lib/axios";
 import { tryCatch } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Rate } from "@/types/Rate";
+import { Rate, RateView, APIRateData } from "@/types/Rate";
+import { parseRate } from "@/lib/csv/rate";
+
+const queryClient = useQueryClient();
 
 export function useRates() {
-  return useQuery<Rate[]>({
+  return useQuery<RateView[]>({
     queryKey: ["rates"],
     queryFn: async () => {
-      const { data } = await axiosClient.get<Rate[]>("/api/rates");
+      const { data } = await axiosClient.get<RateView[]>("/api/rates");
       return data;
     },
   });
 }
 
-export function useRate(id: string) {
-  return useQuery<Rate>({
+export function useRate(id?: string) {
+  return useQuery<RateView>({
     queryKey: ["rates", id],
     queryFn: async () => {
-      const { data } = await axiosClient.get<Rate>(`/api/rates/${id}`);
+      const { data } = await axiosClient.get<RateView>(`/api/rates/${id}`);
       return data;
     },
     enabled: !!id,
   });
 }
 
-export function useRatesByPO(poId: string) {
-  return useQuery<Rate[]>({
-    queryKey: ["rates", "po", poId],
-    queryFn: async () => {
-      const { data } = await axiosClient.get<Rate[]>(`/api/rates?poId=${poId}`);
-      return data;
-    },
-    enabled: !!poId,
-  });
-}
-
-export function useRatesByCWO(cwoId: string) {
-  return useQuery<Rate[]>({
-    queryKey: ["rates", "cwo", cwoId],
-    queryFn: async () => {
-      const { data } = await axiosClient.get<Rate[]>(
-        `/api/rates?cwoId=${cwoId}`
-      );
-      return data;
-    },
-    enabled: !!cwoId,
-  });
-}
-
-export function useCreateRate() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (newRate: Partial<Rate>) => {
-      const result = await tryCatch(async () => {
-        const { data } = await axiosClient.post<Rate>("/api/rates", newRate);
-        return data;
-      });
-
-      if (result.error) throw result.error;
-      return result.data!;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["rates"] });
-      if (data.PO_id) {
-        queryClient.invalidateQueries({
-          queryKey: ["rates", "po", data.PO_id],
-        });
-      }
-      if (data.CWO_id) {
-        queryClient.invalidateQueries({
-          queryKey: ["rates", "cwo", data.CWO_id],
-        });
-      }
-    },
-  });
-}
-
-export function useUpdateRate() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Rate> }) => {
-      const result = await tryCatch(async () => {
-        const { data: updatedRate } = await axiosClient.put<Rate>(
-          `/api/rates/${id}`,
-          data
-        );
-        return updatedRate;
-      });
-
-      if (result.error) throw result.error;
-      return result.data!;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["rates"] });
-      queryClient.invalidateQueries({ queryKey: ["rates", variables.id] });
-      if (variables.data.PO_id) {
-        queryClient.invalidateQueries({
-          queryKey: ["rates", "po", variables.data.PO_id],
-        });
-      }
-      if (variables.data.CWO_id) {
-        queryClient.invalidateQueries({
-          queryKey: ["rates", "cwo", variables.data.CWO_id],
-        });
-      }
-    },
-  });
-}
-
 export function useDeleteRate() {
-  const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: async (id: string) => {
       const result = await tryCatch(async () => {
@@ -129,38 +44,71 @@ export function useDeleteRate() {
   });
 }
 
-export function useBulkCreateRates() {
-  const queryClient = useQueryClient();
-
+export function useUpdateRate() {
   return useMutation({
-    mutationFn: async (newRates: Partial<Rate>[]) => {
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Rate> }) => {
+      const result = await tryCatch(async () => {
+        const { data: updatedRate } = await axiosClient.put<Rate>(
+          `/api/rates/${id}`,
+          data
+        );
+        return updatedRate;
+      });
+
+      if (result.error) throw result.error;
+      return result.data!;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["rates"] });
+      queryClient.invalidateQueries({ queryKey: ["rates", variables.id] });
+    },
+  });
+}
+
+export function useCreateRate() {
+  return useMutation({
+    mutationFn: async (newRates: APIRateData | APIRateData[]) => {
       const result = await tryCatch(async () => {
         const { data } = await axiosClient.post<Rate[]>("/api/rates", newRates);
         return data;
       });
 
       if (result.error) throw result.error;
-      return result.data!;
+      return Array.isArray(newRates) ? result.data! : result.data![0];
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["rates"] });
-
-      // Extract unique PO and CWO IDs for invalidation
-      const poIds = new Set<string>();
-      const cwoIds = new Set<string>();
-
-      data.forEach((rate) => {
-        if (rate.PO_id) poIds.add(rate.PO_id);
-        if (rate.CWO_id) cwoIds.add(rate.CWO_id);
-      });
-
-      poIds.forEach((id) => {
-        queryClient.invalidateQueries({ queryKey: ["rates", "po", id] });
-      });
-
-      cwoIds.forEach((id) => {
-        queryClient.invalidateQueries({ queryKey: ["rates", "cwo", id] });
-      });
     },
   });
+}
+
+export function useParseRateCsv() {
+  return async (file: File) => {
+    const { data, error } = await tryCatch(async () => {
+      const result = await parseRate(file);
+      return result;
+    });
+    if (error) return { error };
+    return { data };
+  };
+}
+
+export function useSearchFilter<T extends Record<string, any>>(
+  data: T[],
+  searchTerm: string,
+  searchFields: (keyof T)[]
+): T[] {
+  if (!searchTerm.trim()) return data;
+
+  const lowercaseSearchTerm = searchTerm.toLowerCase();
+
+  return data.filter((item) =>
+    searchFields.some((field) => {
+      const fieldValue = item[field];
+      return (
+        fieldValue &&
+        String(fieldValue).toLowerCase().includes(lowercaseSearchTerm)
+      );
+    })
+  );
 }

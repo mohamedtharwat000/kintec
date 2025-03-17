@@ -33,6 +33,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { tryCatch } from "@/lib/utils";
+import { Decimal } from "@prisma/client/runtime/library";
 
 // Schema for form validation
 const formSchema = z.object({
@@ -48,8 +50,8 @@ const formSchema = z.object({
     .refine((val) => !isNaN(Number(val)), "Value must be a number"),
   rate_currency: z.string().min(1, "Currency is required"),
   orderReference: z.object({
-    type: z.enum(["PO", "CWO"]),
-    id: z.string().min(1, "Reference ID is required"),
+    type: z.enum(["PO", "CWO", "NONE"]),
+    id: z.string().optional(),
   }),
 });
 
@@ -64,9 +66,7 @@ interface RateFormProps {
 
 export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
   const isEditing = !!rateId;
-  const { data: existingRate, isLoading: isLoadingRate } = useRate(
-    rateId || ""
-  );
+  const { data: existingRate, isLoading: isLoadingRate } = useRate(rateId);
 
   const { data: purchaseOrders = [] } = usePurchaseOrders();
   const { data: calloffWorkOrders = [] } = useCalloffWorkOrders();
@@ -82,7 +82,7 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
       rate_value: "",
       rate_currency: "USD",
       orderReference: {
-        type: "PO",
+        type: "NONE",
         id: "",
       },
     },
@@ -91,14 +91,25 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
   // Populate form with existing rate data
   useEffect(() => {
     if (isEditing && existingRate) {
+      let referenceType = "NONE";
+      let referenceId = "";
+
+      if (existingRate.PO_id) {
+        referenceType = "PO";
+        referenceId = existingRate.PO_id;
+      } else if (existingRate.CWO_id) {
+        referenceType = "CWO";
+        referenceId = existingRate.CWO_id;
+      }
+
       form.reset({
-        rate_type: existingRate.rate_type,
-        rate_frequency: existingRate.rate_frequency,
-        rate_value: existingRate.rate_value.toString(),
+        rate_type: existingRate.rate_type as RateType,
+        rate_frequency: existingRate.rate_frequency as RateFrequency,
+        rate_value: String(existingRate.rate_value),
         rate_currency: existingRate.rate_currency,
         orderReference: {
-          type: existingRate.PO_id ? "PO" : "CWO",
-          id: existingRate.PO_id || existingRate.CWO_id || "",
+          type: referenceType as "PO" | "CWO" | "NONE",
+          id: referenceId,
         },
       });
     } else if (!isEditing && open) {
@@ -109,7 +120,7 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
         rate_value: "",
         rate_currency: "USD",
         orderReference: {
-          type: "PO",
+          type: "NONE",
           id: "",
         },
       });
@@ -118,25 +129,25 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
 
   // Handle form submission
   const onSubmit = async (data: FormData) => {
-    try {
+    const { error } = await tryCatch(async () => {
       const payload = {
         rate_type: data.rate_type,
         rate_frequency: data.rate_frequency,
-        rate_value: parseFloat(data.rate_value),
+        rate_value: new Decimal(data.rate_value),
         rate_currency: data.rate_currency,
         PO_id:
           data.orderReference.type === "PO"
-            ? data.orderReference.id
-            : undefined,
+            ? data.orderReference.id || null
+            : null,
         CWO_id:
           data.orderReference.type === "CWO"
-            ? data.orderReference.id
-            : undefined,
+            ? data.orderReference.id || null
+            : null,
       };
 
       if (isEditing) {
         await updateRate.mutateAsync({
-          id: rateId,
+          id: rateId!,
           data: payload,
         });
         toast.success("Rate updated successfully");
@@ -149,7 +160,9 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
         onSuccess();
       }
       onClose();
-    } catch (error) {
+    });
+
+    if (error) {
       console.error(error);
       toast.error(
         isEditing ? "Failed to update rate" : "Failed to create rate"
@@ -326,7 +339,10 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
                     <FormItem>
                       <FormLabel>Reference Type</FormLabel>
                       <Select
-                        onValueChange={field.onChange}
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          form.setValue("orderReference.id", "");
+                        }}
                         defaultValue={field.value}
                         value={field.value}
                         disabled={isSubmitting || isEditing} // Cannot change reference type in edit mode
@@ -337,6 +353,7 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value="NONE">None</SelectItem>
                           <SelectItem value="PO">Purchase Order</SelectItem>
                           <SelectItem value="CWO">
                             Call-off Work Order
@@ -348,49 +365,58 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="orderReference.id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        {referenceType === "PO"
-                          ? "Purchase Order"
-                          : "Call-off Work Order"}
-                      </FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        value={field.value}
-                        disabled={isSubmitting}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue
-                              placeholder={`Select ${
-                                referenceType === "PO" ? "PO" : "CWO"
-                              }`}
-                            />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
+                {referenceType !== "NONE" && (
+                  <FormField
+                    control={form.control}
+                    name="orderReference.id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
                           {referenceType === "PO"
-                            ? purchaseOrders.map((po) => (
-                                <SelectItem key={po.PO_id} value={po.PO_id}>
-                                  {po.PO_id}
-                                </SelectItem>
-                              ))
-                            : calloffWorkOrders.map((cwo) => (
-                                <SelectItem key={cwo.CWO_id} value={cwo.CWO_id}>
-                                  {cwo.CWO_id}
-                                </SelectItem>
-                              ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                            ? "Purchase Order"
+                            : "Call-off Work Order"}
+                        </FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          value={field.value}
+                          disabled={isSubmitting || isEditing} // Cannot change reference in edit mode
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue
+                                placeholder={`Select a ${referenceType === "PO" ? "purchase order" : "call-off work order"}`}
+                              />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {referenceType === "PO"
+                              ? purchaseOrders.map((po) => (
+                                  <SelectItem key={po.PO_id} value={po.PO_id}>
+                                    {po.PO_id}{" "}
+                                    {po.contract?.job_title
+                                      ? `- ${po.contract.job_title}`
+                                      : ""}
+                                  </SelectItem>
+                                ))
+                              : calloffWorkOrders.map((cwo) => (
+                                  <SelectItem
+                                    key={cwo.CWO_id}
+                                    value={cwo.CWO_id}
+                                  >
+                                    {cwo.CWO_id}{" "}
+                                    {cwo.contract?.job_title
+                                      ? `- ${cwo.contract.job_title}`
+                                      : ""}
+                                  </SelectItem>
+                                ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
 
               <DialogFooter className="pt-4">
@@ -404,11 +430,16 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {isEditing ? "Updating..." : "Saving..."}
+                    </>
                   ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isEditing ? "Update" : "Save"}
+                    </>
                   )}
-                  {isEditing ? "Update" : "Save"}
                 </Button>
               </DialogFooter>
             </form>

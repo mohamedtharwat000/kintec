@@ -4,7 +4,6 @@ import { validateClientCompanies } from "@/lib/validation/clientCompany";
 
 export interface ParseResult<T> {
   data: T[];
-  dataToUpload?: unknown[];
   errors: { row: number; error: string }[];
   meta: Papa.ParseMeta;
 }
@@ -18,11 +17,9 @@ export function parseClientCompany(
       skipEmptyLines: true,
       complete: (results) => {
         const processedData = results.data;
-        const { validationErrors, validData } =
-          validateClientCompanies(processedData);
+        const validationErrors = validateClientCompanies(processedData);
         resolve({
           data: processedData,
-          dataToUpload: validData,
           errors: validationErrors,
           meta: results.meta,
         });

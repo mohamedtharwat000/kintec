@@ -1,26 +1,24 @@
 import { prisma } from "@/lib/prisma";
+import {
+  Contractor,
+  ContractorView,
+  APIContractorData,
+} from "@/types/Contractor";
 
-export const createContractor = async (data: {
-  contractor_id?: string;
-  first_name: string;
-  middle_name?: string;
-  last_name: string;
-  date_of_birth: string;
-  email_address: string;
-  phone_number: string;
-  nationality: string;
-  address: string;
-  country_of_residence: string;
-}) => {
-  return prisma.contractor.create({
-    data: {
-      ...data,
-      contractor_id: data.contractor_id || undefined,
+export const getAllContractors = async (): Promise<ContractorView[]> => {
+  return prisma.contractor.findMany({
+    include: {
+      bank_details: true,
+      visa_details: true,
+      contracts: true,
+      submissions: true,
     },
   });
 };
 
-export const getContractorById = async (id: string) => {
+export const getContractorById = async (
+  id: string
+): Promise<ContractorView | null> => {
   return prisma.contractor.findUnique({
     where: { contractor_id: id },
     include: {
@@ -32,76 +30,34 @@ export const getContractorById = async (id: string) => {
   });
 };
 
-export const updateContractor = async (id: string, data: any) => {
+export const deleteContractor = async (id: string): Promise<Contractor> => {
+  return prisma.contractor.delete({
+    where: { contractor_id: id },
+  });
+};
+
+export const updateContractor = async (
+  id: string,
+  data: Partial<Contractor>
+): Promise<Contractor> => {
   return prisma.contractor.update({
     where: { contractor_id: id },
     data,
   });
 };
 
-export const deleteContractor = async (id: string) => {
-  return prisma.contractor.delete({
-    where: { contractor_id: id },
-  });
-};
+export const createContractor = async (
+  data: APIContractorData | APIContractorData[]
+): Promise<Contractor[]> => {
+  const receivedData: APIContractorData[] = Array.isArray(data) ? data : [data];
 
-export const getAllContractors = async () => {
-  return prisma.contractor.findMany({
-    include: {
-      bank_details: true,
-      visa_details: true,
-      contracts: true,
-      submissions: true,
-    },
-  });
-};
+  return Promise.all(
+    receivedData.map((contractor) => {
+      if (contractor.contractor_id === "") contractor.contractor_id = undefined;
 
-export const createContractors = async (
-  data: Array<{
-    contractor_id?: string;
-    first_name: string;
-    middle_name?: string;
-    last_name: string;
-    date_of_birth: string;
-    email_address: string;
-    phone_number: string;
-    nationality: string;
-    address: string;
-    country_of_residence: string;
-  }>
-) => {
-  return prisma.$transaction(async (prisma) => {
-    const contractors = [];
-
-    for (const contractorData of data) {
-      const contData = { ...contractorData, contractor_id: contractorData.contractor_id || undefined, }
-      const contractor = await prisma.contractor.create({
-        data: contData,
+      return prisma.contractor.create({
+        data: contractor,
       });
-
-      contractors.push(contractor);
-    }
-
-    return contractors;
-  });
-};
-
-export const updateContractorData = async (data: {
-  contractor_id: string;
-  first_name?: string;
-  middle_name?: string;
-  last_name?: string;
-  date_of_birth?: string;
-  email_address?: string;
-  phone_number?: string;
-  nationality?: string;
-  address?: string;
-  country_of_residence?: string;
-}) => {
-  const { contractor_id, ...contractorInfo } = data;
-
-  return prisma.contractor.update({
-    where: { contractor_id },
-    data: contractorInfo,
-  });
+    })
+  );
 };

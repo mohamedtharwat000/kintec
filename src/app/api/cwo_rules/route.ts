@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import {
   getAllCwoRules,
   createCwoRule,
-  createCwoRules,
 } from "@/services/cwo_rules/CwoRuleService";
+import { APICWORuleData } from "@/types/CWORule";
 
 export async function GET() {
   try {
@@ -20,21 +21,17 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const requestData: APICWORuleData | APICWORuleData[] = await request.json();
+    const cwoRules = await createCwoRule(requestData);
 
-    // Check if it's a batch operation
-    if (Array.isArray(body)) {
-      const newRules = await createCwoRules(body);
-      return NextResponse.json(newRules, { status: 201 });
+    return NextResponse.json(cwoRules, { status: 201 });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     } else {
-      const newRule = await createCwoRule(body);
-      return NextResponse.json(newRule, { status: 201 });
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
-  } catch (error: any) {
-    console.error(error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
   }
 }

@@ -1,9 +1,10 @@
 import Papa from "papaparse";
-import { PurchaseOrder } from "@/types/Orders";
+import { PurchaseOrder } from "@/types/PurchaseOrder";
+import { validatePurchaseOrders } from "@/lib/validation/purchaseOrder";
 
 export interface ParseResult<T> {
   data: T[];
-  errors: Papa.ParseError[];
+  errors: { row: number; error: string }[];
   meta: Papa.ParseMeta;
 }
 
@@ -14,45 +15,16 @@ export function parsePurchaseOrder(
     Papa.parse<Partial<PurchaseOrder>>(file, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: (header) => {
-        const headerMap: Record<string, string> = {
-          "PO ID": "PO_id",
-          "Start Date": "PO_start_date",
-          "End Date": "PO_end_date",
-          "Contract ID": "contract_id",
-          "Total Value": "PO_total_value",
-          Status: "PO_status",
-          "Remittance Email": "kintec_email_for_remittance",
-        };
-
-        return headerMap[header] || header;
-      },
-      transform: (value, field) => {
-        if (field === "PO_start_date" || field === "PO_end_date") {
-          if (!value) return "";
-          try {
-            const date = new Date(value);
-            return date.toISOString();
-          } catch (e) {
-            return value;
-          }
-        }
-
-        if (field === "PO_total_value") {
-          if (!value) return "";
-          return parseFloat(value);
-        }
-
-        return value;
-      },
       complete: (results) => {
+        const processedData = results.data;
+        const validationErrors = validatePurchaseOrders(processedData);
         resolve({
-          data: results.data,
-          errors: results.errors,
+          data: processedData,
+          errors: validationErrors,
           meta: results.meta,
         });
       },
-      error: (error) => {
+      error(error: Error) {
         reject(error);
       },
     });

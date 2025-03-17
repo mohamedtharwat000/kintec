@@ -1,9 +1,10 @@
 import Papa from "papaparse";
 import { Expense } from "@/types/Expense";
+import { validateExpense } from "@/lib/validation/expense";
 
 export interface ParseResult<T> {
   data: T[];
-  errors: Papa.ParseError[];
+  errors: { row: number; error: string }[];
   meta: Papa.ParseMeta;
 }
 
@@ -14,36 +15,16 @@ export function parseExpense(
     Papa.parse<Partial<Expense>>(file, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: (header) => {
-        const headerMap: Record<string, string> = {
-          "Expense Type": "expense_type",
-          "Expense Frequency": "expense_frequency",
-          "Expense Value": "expense_value",
-          Currency: "expsense_currency",
-          "Pro Rata Percentage": "pro_rata_percentage",
-          "PO ID": "PO_id",
-          "CWO ID": "CWO_id",
-        };
-
-        return headerMap[header] || header;
-      },
-      transform: (value, field) => {
-        if (field === "expense_value") {
-          return value ? parseFloat(value) : 0;
-        }
-        if (field === "pro_rata_percentage") {
-          return value ? parseFloat(value) : 100;
-        }
-        return value;
-      },
       complete: (results) => {
+        const processedData = results.data;
+        const validationErrors = validateExpense(processedData);
         resolve({
-          data: results.data,
-          errors: results.errors,
+          data: processedData,
+          errors: validationErrors,
           meta: results.meta,
         });
       },
-      error: (error) => {
+      error(error: Error) {
         reject(error);
       },
     });

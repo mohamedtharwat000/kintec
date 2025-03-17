@@ -51,9 +51,8 @@ export function ClientForm({
   onSuccess,
 }: ClientFormProps) {
   const isEditing = !!clientId;
-  const { data: existingClient, isLoading: isLoadingClient } = useClient(
-    clientId || ""
-  );
+  const { data: existingClient, isLoading: isLoadingClient } =
+    useClient(clientId);
 
   const createClient = useCreateClient();
   const updateClient = useUpdateClient();
@@ -88,19 +87,14 @@ export function ClientForm({
     const { error } = await tryCatch(async () => {
       if (isEditing) {
         await updateClient.mutateAsync({
-          id: clientId,
-          data: {
-            ...data,
-            invoice_submission_deadline:
-              data.invoice_submission_deadline || undefined,
-          },
+          id: clientId!,
+          data,
         });
         toast.success("Company updated successfully");
       } else {
         await createClient.mutateAsync({
           ...data,
-          invoice_submission_deadline:
-            data.invoice_submission_deadline || undefined,
+          invoice_submission_deadline: data.invoice_submission_deadline || null,
         });
         toast.success("Company added successfully");
       }

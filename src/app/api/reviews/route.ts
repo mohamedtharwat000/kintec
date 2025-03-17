@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { getAllReviews, createReview } from "@/services/reviews/reviewService";
+import { APIReviewData } from "@/types/Review";
 
 export async function GET() {
   try {
@@ -16,14 +18,17 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const newReview = await createReview(body);
-    return NextResponse.json(newReview, { status: 201 });
+    const requestData: APIReviewData | APIReviewData[] = await request.json();
+    const reviews = await createReview(requestData);
+
+    return NextResponse.json(reviews, { status: 201 });
   } catch (error) {
-    console.error(error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    } else {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
+    }
   }
 }

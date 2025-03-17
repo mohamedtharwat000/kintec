@@ -1,18 +1,18 @@
-import { Contractor } from "@/types/Contractor";
+import { bank_detail, contractor } from "@prisma/client";
 
-export interface BankDetail {
-  bank_detail_id: string;
-  contractor_id: string;
-  bank_name: string;
-  account_number: string;
-  IBAN: string;
-  SWIFT: string;
-  currency: string;
-  bank_detail_type: BankDetailType;
-  bank_detail_validated?: boolean;
-  last_updated: Date;
-  contractor?: Contractor;
-}
+export type BankDetail = bank_detail;
+
+export type BankDetailView = BankDetail & {
+  contractor?: contractor;
+};
+
+export type MakePropertyOptional<T, K extends keyof T> = Omit<T, K> &
+  Partial<Pick<T, K>>;
+
+export type APIBankDetailData = MakePropertyOptional<
+  BankDetail,
+  "bank_detail_id"
+>;
 
 export enum BankDetailType {
   primary = "primary",

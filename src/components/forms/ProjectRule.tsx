@@ -37,7 +37,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { AdditionalReviewProcess } from "@/types/Project";
+import { AdditionalReviewProcess } from "@/types/ProjectRule";
+import { tryCatch } from "@/lib/utils";
 
 const formSchema = z.object({
   project_id: z.string().min(1, "Project is required"),
@@ -89,37 +90,39 @@ export function ProjectRuleForm({
         project_rules_reviewer_name:
           existingProjectRule.project_rules_reviewer_name || "",
         additional_review_process:
-          existingProjectRule.additional_review_process,
+          existingProjectRule.additional_review_process ?? undefined,
         major_project_indicator:
           existingProjectRule.major_project_indicator || false,
       });
+    } else if (!isEditing && open) {
+      form.reset({
+        project_id: "",
+        special_project_rules: "",
+        project_rules_reviewer_name: "",
+        additional_review_process: undefined,
+        major_project_indicator: false,
+      });
     }
-  }, [existingProjectRule, form, isEditing]);
+  }, [existingProjectRule, form, isEditing, open]);
 
   const onSubmit = async (data: FormData) => {
-    try {
+    const { error } = await tryCatch(async () => {
       if (isEditing) {
         await updateProjectRule.mutateAsync({
           id: projectRuleId!,
           data: {
             ...data,
-            additional_review_process: data.additional_review_process as
-              | AdditionalReviewProcess
-              | undefined,
+            additional_review_process: data.additional_review_process ?? null,
           },
         });
         toast.success("Project rule updated successfully");
       } else {
-        const projectRuleData = {
-          ...data,
-          project_rule_id: crypto.randomUUID(),
-        };
         await createProjectRule.mutateAsync({
-          ...projectRuleData,
-          additional_review_process:
-            projectRuleData.additional_review_process as
-              | AdditionalReviewProcess
-              | undefined,
+          ...data,
+          special_project_rules: data.special_project_rules || null,
+          project_rules_reviewer_name: data.project_rules_reviewer_name || null,
+          additional_review_process: data.additional_review_process || null,
+          major_project_indicator: data.major_project_indicator || null,
         });
         toast.success("Project rule added successfully");
       }
@@ -128,7 +131,9 @@ export function ProjectRuleForm({
         onSuccess();
       }
       onClose();
-    } catch (error) {
+    });
+
+    if (error) {
       console.error(error);
       toast.error(
         isEditing
@@ -142,8 +147,15 @@ export function ProjectRuleForm({
     createProjectRule.isPending || updateProjectRule.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!isSubmitting && !open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-[80vw] max-h-[80vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Project Rule" : "Add New Project Rule"}
@@ -271,7 +283,7 @@ export function ProjectRuleForm({
                     </div>
                     <FormControl>
                       <Switch
-                        checked={field.value}
+                        checked={field.value || false}
                         onCheckedChange={field.onChange}
                         disabled={isSubmitting}
                       />
@@ -280,7 +292,7 @@ export function ProjectRuleForm({
                 )}
               />
 
-              <DialogFooter>
+              <DialogFooter className="pt-4">
                 <Button
                   variant="outline"
                   onClick={onClose}
@@ -291,11 +303,16 @@ export function ProjectRuleForm({
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {isEditing ? "Updating..." : "Saving..."}
+                    </>
                   ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isEditing ? "Update" : "Save"}
+                    </>
                   )}
-                  {isEditing ? "Update" : "Save"}
                 </Button>
               </DialogFooter>
             </form>

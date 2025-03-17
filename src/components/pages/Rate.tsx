@@ -1,50 +1,72 @@
 "use client";
 
 import { useState } from "react";
-import { useRates, useDeleteRate, useBulkCreateRates } from "@/hooks/useRates";
+import {
+  useRates,
+  useDeleteRate,
+  useCreateRate,
+  useSearchFilter,
+  useParseRateCsv,
+} from "@/hooks/useRates";
 import { DataTable } from "@/components/dataTable/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, Pencil, Trash2, Upload } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Upload, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Rate as RateInterface, RateType, RateFrequency } from "@/types/Rate";
-import { toast } from "sonner";
-import { parseRate } from "@/lib/csv/rate";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { CSVPreviewDialog } from "@/components/csvPreviewDialog/Rate";
-import { RateDetails } from "@/components/detailsDialogs/Rate";
 import { RateForm } from "@/components/forms/Rate";
+import { Badge } from "@/components/ui/badge";
+import { RateView, RateType, RateFrequency } from "@/types/Rate";
+import { toast } from "sonner";
+import { CSVPreviewDialog } from "@/components/reusableModels/CSVPreviewDialog";
+import { DeleteConfirmationDialog } from "@/components/reusableModels/DeleteConfirmationDialog";
+import {
+  DetailsDialog,
+  DetailSection,
+} from "@/components/reusableModels/DetailsDialog";
 
 export function Rate() {
-  const { data: rates = [], isLoading } = useRates();
+  // Core data fetching hook
+  const { data: rates = [], isLoading, refetch } = useRates();
   const deleteRate = useDeleteRate();
-  const bulkCreateRates = useBulkCreateRates();
+  const createRate = useCreateRate();
+  const parseCSV = useParseRateCsv();
 
+  // Page-level state management
   const [searchTerm, setSearchTerm] = useState("");
-  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedRateId, setSelectedRateId] = useState<string | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [rateToDelete, setRateToDelete] = useState<string | null>(null);
 
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [csvData, setCsvData] = useState<Partial<RateInterface>[]>([]);
-  const [csvFileName, setCsvFileName] = useState("");
-  const [validationErrors, setValidationErrors] = useState<
+  // Form dialog state
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [selectedRateId, setSelectedRateId] = useState<string>();
+
+  // Details dialog state
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [selectedRateForDetails, setSelectedRateForDetails] = useState<
+    RateView | undefined
+  >(undefined);
+
+  // CSV dialog state
+  const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvValidationErrors, setCsvValidationErrors] = useState<
     { row: number; error: string }[]
   >([]);
 
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [rateToDelete, setRateToDelete] = useState<string | null>(null);
+
+  // Filter data based on search term
+  const filteredData = useSearchFilter<RateView>(rates, searchTerm, [
+    "rate_type",
+    "rate_frequency",
+    "rate_value",
+    "rate_currency",
+  ]);
+
+  // Simple handlers for UI actions
   const handleAddClick = () => {
-    setSelectedRateId(null);
+    setSelectedRateId(undefined);
     setIsFormDialogOpen(true);
   };
 
@@ -53,136 +75,191 @@ export function Rate() {
     setIsFormDialogOpen(true);
   };
 
+  const handleDetailsClick = (rate: RateView) => {
+    setSelectedRateForDetails(rate);
+    setIsDetailsDialogOpen(true);
+  };
+
   const handleDeleteClick = (rateId: string) => {
     setRateToDelete(rateId);
     setDeleteDialogOpen(true);
   };
 
-  const handleFormClose = () => {
-    setIsFormDialogOpen(false);
-  };
-
-  const handleFormSuccess = () => {
-    // The form itself will close the dialog
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!rateToDelete) return;
-
-    try {
-      await deleteRate.mutateAsync(rateToDelete);
-      toast.success("Rate deleted successfully");
-    } catch (error) {
-      toast.error("Failed to delete rate");
-    } finally {
-      setDeleteDialogOpen(false);
-      setRateToDelete(null);
-    }
-  };
-
-  const handleFileUpload = async (
+  const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      setUploadFile(file);
 
-    try {
-      const result = await parseRate(file);
-      setCsvFileName(file.name);
-      setCsvData(result.data);
+      const result = await parseCSV(file);
+      if (result.data) {
+        setCsvData(result.data.data);
+        setCsvValidationErrors(result.data.errors);
+        setIsCSVDialogOpen(true);
+      } else if (result.error) {
+        toast.error(`Failed to parse CSV: ${result.error.message}`);
+      }
 
-      // Validate data
-      const errors: { row: number; error: string }[] = [];
-      result.data.forEach((item, index) => {
-        // Check if either PO_id or CWO_id is provided but not both
-        if ((!item.PO_id && !item.CWO_id) || (item.PO_id && item.CWO_id)) {
-          errors.push({
-            row: index + 1,
-            error: "Either PO_id or CWO_id must be provided, but not both",
-          });
-        }
-
-        if (!item.rate_type) {
-          errors.push({ row: index + 1, error: "Rate type is required" });
-        } else if (
-          !Object.values(RateType).includes(item.rate_type as RateType)
-        ) {
-          errors.push({
-            row: index + 1,
-            error: "Rate type must be either 'charged' or 'paid'",
-          });
-        }
-
-        if (!item.rate_frequency) {
-          errors.push({ row: index + 1, error: "Rate frequency is required" });
-        } else if (
-          !Object.values(RateFrequency).includes(
-            item.rate_frequency as RateFrequency
-          )
-        ) {
-          errors.push({
-            row: index + 1,
-            error: "Rate frequency must be 'hourly', 'daily', or 'monthly'",
-          });
-        }
-
-        if (!item.rate_value) {
-          errors.push({ row: index + 1, error: "Rate value is required" });
-        } else if (isNaN(Number(item.rate_value))) {
-          errors.push({ row: index + 1, error: "Rate value must be a number" });
-        }
-
-        if (!item.rate_currency) {
-          errors.push({ row: index + 1, error: "Currency is required" });
-        }
-      });
-
-      setValidationErrors(errors);
-
-      // Show preview dialog
-      setIsPreviewOpen(true);
-    } catch (error) {
-      console.error("Error parsing CSV:", error);
-      toast.error("Failed to parse CSV file");
-    } finally {
-      // Reset the file input
       event.target.value = "";
     }
   };
 
-  // Handle CSV data import confirmation
-  const handleConfirmCsvUpload = async () => {
+  const handleCSVDialogClose = () => {
+    setIsCSVDialogOpen(false);
+    setCsvData([]);
+    setCsvValidationErrors([]);
+    setUploadFile(null);
+  };
+
+  const handleCsvUpload = async () => {
+    if (!csvData.length) return;
+
     try {
-      await bulkCreateRates.mutateAsync(csvData);
+      await createRate.mutateAsync(csvData);
       toast.success(`Successfully imported ${csvData.length} rates`);
-      return Promise.resolve();
+      refetch();
+      setIsCSVDialogOpen(false);
+      setCsvData([]);
+      setCsvValidationErrors([]);
+      setUploadFile(null);
     } catch (error) {
-      console.error("Error importing CSV data:", error);
-      toast.error("Failed to import rates from CSV");
-      return Promise.reject(error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to import rates: ${errorMessage}`);
     }
   };
 
+  const handleFormSuccess = () => {
+    refetch();
+    setIsFormDialogOpen(false);
+  };
+
+  // Helper function to safely convert any value to a number
+  const safelyParseNumber = (value: any): number => {
+    if (typeof value === "number") return value;
+    if (value === null || value === undefined) return 0;
+    // Handle Decimal objects from Prisma
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "toNumber" in value &&
+      typeof value.toNumber === "function"
+    ) {
+      return value.toNumber();
+    }
+    return Number(value) || 0;
+  };
+
   // Format currency with value
-  const formatCurrency = (value: number, currency: string) => {
+  const formatCurrency = (value: any, currency: string) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: currency,
       minimumFractionDigits: 2,
-    }).format(value);
+    }).format(safelyParseNumber(value));
   };
 
-  const columns: ColumnDef<RateInterface>[] = [
+  // Generate detail sections for the rate
+  const getRateDetailSections = (): DetailSection[] => {
+    if (!selectedRateForDetails) return [];
+
+    return [
+      {
+        title: "Rate Information",
+        items: [
+          { label: "Rate ID", value: selectedRateForDetails.rate_id },
+          {
+            label: "Rate Type",
+            value: selectedRateForDetails.rate_type,
+          },
+          {
+            label: "Rate Frequency",
+            value: selectedRateForDetails.rate_frequency,
+          },
+          {
+            label: "Rate Value",
+            value: formatCurrency(
+              selectedRateForDetails.rate_value,
+              selectedRateForDetails.rate_currency
+            ),
+          },
+          {
+            label: "Currency",
+            value: selectedRateForDetails.rate_currency,
+          },
+        ],
+      },
+      ...(selectedRateForDetails.purchase_order
+        ? [
+            {
+              title: "Purchase Order",
+              items: [
+                {
+                  label: "PO ID",
+                  value: selectedRateForDetails.purchase_order.PO_id,
+                },
+                {
+                  label: "Total Value",
+                  value: formatCurrency(
+                    selectedRateForDetails.purchase_order.PO_total_value,
+                    "USD"
+                  ),
+                },
+                {
+                  label: "Status",
+                  value: (
+                    <Badge>
+                      {selectedRateForDetails.purchase_order.PO_status}
+                    </Badge>
+                  ),
+                },
+              ],
+            },
+          ]
+        : []),
+      ...(selectedRateForDetails.calloff_work_order
+        ? [
+            {
+              title: "Call-off Work Order",
+              items: [
+                {
+                  label: "CWO ID",
+                  value: selectedRateForDetails.calloff_work_order.CWO_id,
+                },
+                {
+                  label: "Total Value",
+                  value: formatCurrency(
+                    selectedRateForDetails.calloff_work_order.CWO_total_value,
+                    "USD"
+                  ),
+                },
+                {
+                  label: "Status",
+                  value: (
+                    <Badge>
+                      {selectedRateForDetails.calloff_work_order.CWO_status}
+                    </Badge>
+                  ),
+                },
+              ],
+            },
+          ]
+        : []),
+    ];
+  };
+
+  const columns: ColumnDef<RateView>[] = [
     {
       accessorKey: "rate_type",
-      header: "Rate Type",
+      header: () => <div className="text-center">Rate Type</div>,
       cell: ({ row }) => {
         const type = row.getValue("rate_type") as RateType;
         return (
           <Badge
-            className={
+            className={`${
               type === RateType.charged ? "bg-blue-500" : "bg-green-500"
-            }
+            } hover:${type === RateType.charged ? "bg-blue-600" : "bg-green-600"}`}
           >
             {type}
           </Badge>
@@ -191,49 +268,53 @@ export function Rate() {
     },
     {
       accessorKey: "rate_frequency",
-      header: "Frequency",
+      header: () => <div className="text-center">Frequency</div>,
       cell: ({ row }) => {
-        return <div>{row.getValue("rate_frequency") as string}</div>;
-      },
-    },
-    {
-      accessorKey: "rate_value",
-      header: "Rate Value",
-      cell: ({ row }) => {
-        const value = row.getValue("rate_value") as number;
-        const currency = row.original.rate_currency;
-        return <div>{formatCurrency(value, currency)}</div>;
-      },
-    },
-    {
-      accessorKey: "purchase_order",
-      header: "PO Reference",
-      cell: ({ row }) => {
-        const po = row.original.purchase_order;
-        return po ? (
-          <div className="font-medium">{po.PO_id}</div>
-        ) : (
-          <div className="text-gray-400">N/A</div>
+        return (
+          <div className="text-center">{row.getValue("rate_frequency")}</div>
         );
       },
     },
     {
-      accessorKey: "calloff_work_order",
-      header: "CWO Reference",
+      accessorKey: "rate_value",
+      header: () => <div className="text-center">Rate Value</div>,
       cell: ({ row }) => {
-        const cwo = row.original.calloff_work_order;
-        return cwo ? (
-          <div className="font-medium">{cwo.CWO_id}</div>
-        ) : (
-          <div className="text-gray-400">N/A</div>
+        const value = safelyParseNumber(row.getValue("rate_value"));
+        const currency = row.original.rate_currency;
+        return (
+          <div className="text-right">{formatCurrency(value, currency)}</div>
+        );
+      },
+    },
+    {
+      accessorKey: "PO_id",
+      header: () => <div className="text-center">PO Reference</div>,
+      cell: ({ row }) => {
+        const poId = row.original.PO_id;
+        return (
+          <div className="text-center">
+            {poId ? <span className="text-blue-600">{poId}</span> : "-"}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "CWO_id",
+      header: () => <div className="text-center">CWO Reference</div>,
+      cell: ({ row }) => {
+        const cwoId = row.original.CWO_id;
+        return (
+          <div className="text-center">
+            {cwoId ? <span className="text-green-600">{cwoId}</span> : "-"}
+          </div>
         );
       },
     },
     {
       id: "actions",
-      header: "Actions",
+      header: () => <div className="text-center">Actions</div>,
       cell: ({ row }) => (
-        <div className="flex space-x-2">
+        <div className="flex justify-center gap-2">
           <Button
             variant="ghost"
             size="icon"
@@ -248,58 +329,51 @@ export function Rate() {
           >
             <Trash2 className="h-4 w-4 text-red-500" />
           </Button>
-          <RateDetails rate={row.original} />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleDetailsClick(row.original)}
+          >
+            <Info className="h-4 w-4" />
+          </Button>
         </div>
       ),
     },
   ];
 
-  // Filter data based on search term
-  const filteredData = rates.filter(
-    (rate) =>
-      rate.rate_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      rate.rate_frequency.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      rate.rate_value.toString().includes(searchTerm) ||
-      rate.rate_currency.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (rate.purchase_order?.PO_id || "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      (rate.calloff_work_order?.CWO_id || "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase())
-  );
-
   return (
-    <div className="p-8">
-      <div className="mb-8 flex justify-between items-center">
-        <h1 className="text-2xl font-semibold">Rate Management</h1>
-        <div className="flex gap-2">
-          <div className="relative">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleFileUpload}
-              className="hidden"
-              id="csv-upload"
-            />
-            <Button
-              variant="outline"
-              onClick={() => document.getElementById("csv-upload")?.click()}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Upload CSV
-            </Button>
-          </div>
-          <Button onClick={handleAddClick}>
+    <div className="flex flex-col gap-4 p-4">
+      <h1 className="text-xl sm:text-2xl font-semibold">Rate Management</h1>
+      <div className="flex flex-wrap justify-between items-center gap-2">
+        <div className="relative flex flex-1 items-center gap-2">
+          <Button
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={handleAddClick}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Rate
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => document.getElementById("csv-upload")?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Upload CSV
+          </Button>
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleFileChange}
+            className="hidden"
+            id="csv-upload"
+          />
         </div>
-      </div>
 
-      <div className="mb-6 flex gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <div className="relative flex flex-1 items-center justify-center gap-2 p-2 min-w-16">
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
           <Input
             className="pl-10"
             placeholder="Search rates..."
@@ -309,6 +383,7 @@ export function Rate() {
         </div>
       </div>
 
+      {/* Data Table */}
       <DataTable
         columns={columns}
         data={filteredData}
@@ -318,42 +393,49 @@ export function Rate() {
 
       {/* Add/Edit Form Dialog */}
       <RateForm
-        rateId={selectedRateId || undefined}
+        rateId={selectedRateId}
         open={isFormDialogOpen}
-        onClose={handleFormClose}
+        onClose={() => setIsFormDialogOpen(false)}
         onSuccess={handleFormSuccess}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              rate and may affect related records.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Details Dialog */}
+      {selectedRateForDetails && (
+        <DetailsDialog
+          title={`Rate Details - ${formatCurrency(
+            selectedRateForDetails.rate_value,
+            selectedRateForDetails.rate_currency
+          )}`}
+          open={isDetailsDialogOpen}
+          onClose={() => setIsDetailsDialogOpen(false)}
+          sections={getRateDetailSections()}
+        />
+      )}
 
       {/* CSV Preview Dialog */}
-      <CSVPreviewDialog
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        data={csvData}
-        fileName={csvFileName}
-        onConfirm={handleConfirmCsvUpload}
-        validationErrors={validationErrors}
+      {uploadFile && (
+        <CSVPreviewDialog
+          isOpen={isCSVDialogOpen}
+          onClose={handleCSVDialogClose}
+          data={csvData}
+          fileName={uploadFile.name}
+          onConfirm={handleCsvUpload}
+          validationErrors={csvValidationErrors}
+          title="Import Rates"
+          description="Review rate data before import"
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onDelete={deleteRate.mutateAsync}
+        itemId={rateToDelete}
+        title="Delete Rate"
+        description="Are you sure you want to delete this rate? This action cannot be undone."
+        successMessage="Rate deleted successfully"
+        errorMessage="Failed to delete rate"
       />
     </div>
   );

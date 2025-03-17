@@ -1,9 +1,10 @@
 import Papa from "papaparse";
-import { ExpenseValidationRule } from "@/types/Expense";
+import { ExpenseValidationRule } from "@/types/ExpenseValidationRule";
+import { validateExpenseValidationRules } from "@/lib/validation/expenseValidationRule";
 
 export interface ParseResult<T> {
   data: T[];
-  errors: Papa.ParseError[];
+  errors: { row: number; error: string }[];
   meta: Papa.ParseMeta;
 }
 
@@ -14,26 +15,16 @@ export function parseExpenseValidationRule(
     Papa.parse<Partial<ExpenseValidationRule>>(file, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: (header) => {
-        const headerMap: Record<string, string> = {
-          "Expense ID": "expense_id",
-          "Allowable Expense Types": "allowable_expense_types",
-          "Expense Documentation": "expense_documentation",
-          "Supporting Documentation Type": "supporting_documentation_type",
-          "Expense Limit": "expense_limit",
-          "Reimbursement Rule": "reimbursement_rule",
-        };
-
-        return headerMap[header] || header;
-      },
       complete: (results) => {
+        const processedData = results.data;
+        const validationErrors = validateExpenseValidationRules(processedData);
         resolve({
-          data: results.data,
-          errors: results.errors,
+          data: processedData,
+          errors: validationErrors,
           meta: results.meta,
         });
       },
-      error: (error) => {
+      error(error: Error) {
         reject(error);
       },
     });

@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import {
   getAllInvoiceFormattingRules,
   createInvoiceFormattingRule,
 } from "@/services/invoice_formatting_rules/invoiceFormattingRuleService";
+import { APIInvoiceFormattingRuleData } from "@/types/InvoiceFormattingRule";
 
 export async function GET() {
   try {
-    const inv_for_rules = await getAllInvoiceFormattingRules();
-    return NextResponse.json(inv_for_rules, { status: 200 });
+    const invFormattingRules = await getAllInvoiceFormattingRules();
+    return NextResponse.json(invFormattingRules, { status: 200 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -19,18 +21,19 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const newInvForRule = await createInvoiceFormattingRule(body);
-    return NextResponse.json(newInvForRule, { status: 201 });
-  } catch (error: any) {
-    console.error(error.code);
+    const requestData:
+      | APIInvoiceFormattingRuleData
+      | APIInvoiceFormattingRuleData[] = await request.json();
+    const invFormattingRules = await createInvoiceFormattingRule(requestData);
 
-    //    if (error instanceof Error && "code" in error && error.code === "P2014") {
-    //        return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
-    //      }
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json(invFormattingRules, { status: 201 });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    } else {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
+    }
   }
 }

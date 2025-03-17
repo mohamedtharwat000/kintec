@@ -34,7 +34,7 @@ import {
   useUpdateCalloffWorkOrder,
 } from "@/hooks/useCalloffWorkOrders";
 import { useContracts } from "@/hooks/useContracts";
-import { PO_Status } from "@/types/Orders";
+import { PO_Status } from "@/types/CalloffWorkOrder";
 import {
   Form,
   FormControl,
@@ -43,6 +43,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { tryCatch } from "@/lib/utils";
 
 const formSchema = z.object({
   contract_id: z.string().min(1, "Contract is required"),
@@ -98,18 +99,33 @@ export function CalloffWorkOrderForm({
     },
   });
 
+  // Safe function to get number value from potential Decimal object
+  const safelyGetNumber = (value: any): number => {
+    if (typeof value === "number") return value;
+    if (value === null || value === undefined) return 0;
+    // Handle Decimal objects from Prisma
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "toNumber" in value &&
+      typeof value.toNumber === "function"
+    ) {
+      return value.toNumber();
+    }
+    return Number(value) || 0;
+  };
+
   useEffect(() => {
     if (isEditing && existingCWO) {
       form.reset({
         contract_id: existingCWO.contract_id,
         CWO_start_date: new Date(existingCWO.CWO_start_date),
         CWO_end_date: new Date(existingCWO.CWO_end_date),
-        CWO_total_value: existingCWO.CWO_total_value as unknown as number,
+        CWO_total_value: safelyGetNumber(existingCWO.CWO_total_value),
         CWO_status: existingCWO.CWO_status as PO_Status,
         kintec_email_for_remittance: existingCWO.kintec_email_for_remittance,
       });
     } else if (!isEditing && open) {
-      // Reset form when opening in create mode
       form.reset({
         contract_id: "",
         CWO_start_date: new Date(),
@@ -122,16 +138,18 @@ export function CalloffWorkOrderForm({
   }, [existingCWO, form, isEditing, open]);
 
   const onSubmit = async (data: FormData) => {
-    try {
+    const { error } = await tryCatch(async () => {
       if (isEditing) {
         await updateCalloffWorkOrder.mutateAsync({
           id: cwoId!,
+          // @ts-ignore - Backend handles conversion to Decimal
           data: {
             ...data,
           },
         });
         toast.success("Call-off work order updated successfully");
       } else {
+        // @ts-ignore - Backend handles conversion to Decimal
         await createCalloffWorkOrder.mutateAsync({
           ...data,
         });
@@ -142,7 +160,9 @@ export function CalloffWorkOrderForm({
         onSuccess();
       }
       onClose();
-    } catch (error) {
+    });
+
+    if (error) {
       console.error(error);
       toast.error(
         isEditing
@@ -155,12 +175,16 @@ export function CalloffWorkOrderForm({
   const isSubmitting =
     createCalloffWorkOrder.isPending || updateCalloffWorkOrder.isPending;
 
-  // Find available contracts (let's allow multiple CWOs per contract)
-  const availableContracts = contracts;
-
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!isSubmitting && !open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-[80vw] max-h-[80vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing
@@ -199,7 +223,7 @@ export function CalloffWorkOrderForm({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {availableContracts.map((contract) => (
+                        {contracts.map((contract) => (
                           <SelectItem
                             key={contract.contract_id}
                             value={contract.contract_id}
@@ -219,7 +243,7 @@ export function CalloffWorkOrderForm({
                   control={form.control}
                   name="CWO_start_date"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem>
                       <FormLabel>Start Date</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
@@ -256,7 +280,7 @@ export function CalloffWorkOrderForm({
                   control={form.control}
                   name="CWO_end_date"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem>
                       <FormLabel>End Date</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
@@ -290,59 +314,57 @@ export function CalloffWorkOrderForm({
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="CWO_total_value"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total Value</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="0.00"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(parseFloat(e.target.value))
-                          }
-                          disabled={isSubmitting}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="CWO_status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        value={field.value}
+              <FormField
+                control={form.control}
+                name="CWO_total_value"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Total Value</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(parseFloat(e.target.value))
+                        }
                         disabled={isSubmitting}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {Object.values(PO_Status).map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {status.charAt(0).toUpperCase() + status.slice(1)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="CWO_status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      value={field.value}
+                      disabled={isSubmitting}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.values(PO_Status).map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}
@@ -374,11 +396,16 @@ export function CalloffWorkOrderForm({
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {isEditing ? "Updating..." : "Saving..."}
+                    </>
                   ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isEditing ? "Update" : "Save"}
+                    </>
                   )}
-                  {isEditing ? "Update" : "Save"}
                 </Button>
               </DialogFooter>
             </form>

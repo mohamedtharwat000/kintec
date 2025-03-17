@@ -6,12 +6,12 @@ import { ClientCompany } from "@/components/pages/ClientCompany";
 import { Contractor } from "@/components/pages/Contractor";
 import { BankDetail } from "@/components/pages/BankDetail";
 import { VisaDetail } from "@/components/pages/VisaDetail";
+import { Contract } from "@/components/pages/Contract";
 import { Project } from "@/components/pages/Project";
 import { ProjectRule } from "@/components/pages/ProjectRule";
-import { Contract } from "@/components/pages/Contract";
 import { PurchaseOrder } from "@/components/pages/PurchaseOrder";
-import { CalloffWorkOrder } from "@/components/pages/CalloffWorkOrder";
 import { PoRule } from "@/components/pages/PoRule";
+import { CalloffWorkOrder } from "@/components/pages/CalloffWorkOrder";
 import { CwoRule } from "@/components/pages/CwoRule";
 import { Invoice } from "@/components/pages/Invoice";
 import { InvoiceFormattingRule } from "@/components/pages/InvoiceFormattingRule";
@@ -49,12 +49,10 @@ export function App({ dashboard }: AppProps) {
     switch (currentView) {
       case "dashboard":
         return dashboard;
-      case "contractors":
-        return <Contractor />;
       case "companies":
         return <ClientCompany />;
-      case "contracts":
-        return <Contract />;
+      case "contractors":
+        return <Contractor />;
       case "bankDetails":
         return <BankDetail />;
       case "visaDetails":
@@ -63,6 +61,8 @@ export function App({ dashboard }: AppProps) {
         return <Project />;
       case "projectRules":
         return <ProjectRule />;
+      case "contracts":
+        return <Contract />;
       case "purchaseOrders":
         return <PurchaseOrder />;
       case "poRules":
@@ -87,14 +87,12 @@ export function App({ dashboard }: AppProps) {
         return <SubmissionValidationRule />;
       case "reviews":
         return <Review />;
-      default:
-        return dashboard;
     }
   };
 
-  if (!isAuthenticated) {
-    return <AppLogin />;
-  }
+  // if (!isAuthenticated) {
+  //   return <AppLogin />;
+  // }
 
   return (
     <div className="flex flex-col h-screen w-screen">

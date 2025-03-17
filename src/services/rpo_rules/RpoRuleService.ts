@@ -1,24 +1,15 @@
 import { prisma } from "@/lib/prisma";
+import { RPO_Rule as RpoRule, APIRPORuleData } from "@/types/PORule";
 
-export const createRpoRule = async (data: {
-  PO_id: string;
-  RPO_number_format: string;
-  final_invoice_label: string;
-  RPO_extension_handling: string;
-  mob_demob_fee_rules: string;
-}) => {
-  return prisma.rPO_rule.create({
-    data: {
-      purchase_order: { connect: { PO_id: data.PO_id } },
-      RPO_number_format: data.RPO_number_format,
-      final_invoice_label: data.final_invoice_label,
-      RPO_extension_handling: data.RPO_extension_handling,
-      mob_demob_fee_rules: data.mob_demob_fee_rules,
+export const getAllRpoRules = async (): Promise<RpoRule[]> => {
+  return prisma.rPO_rule.findMany({
+    include: {
+      purchase_order: true,
     },
   });
 };
 
-export const getRpoRuleById = async (id: string) => {
+export const getRpoRuleById = async (id: string): Promise<RpoRule | null> => {
   return prisma.rPO_rule.findUnique({
     where: { RPO_rule_id: id },
     include: {
@@ -27,55 +18,34 @@ export const getRpoRuleById = async (id: string) => {
   });
 };
 
-export const updateRpoRule = async (id: string, data: any) => {
-  const { PO_id, ...rest } = data;
-
-  return prisma.rPO_rule.update({
-    where: { RPO_rule_id: id },
-    data: {
-      ...rest,
-      ...(PO_id && { purchase_order: { connect: { PO_id } } }),
-    },
-  });
-};
-
-export const deleteRpoRule = async (id: string) => {
+export const deleteRpoRule = async (id: string): Promise<RpoRule> => {
   return prisma.rPO_rule.delete({
     where: { RPO_rule_id: id },
   });
 };
 
-export const getAllRpoRules = async () => {
-  return prisma.rPO_rule.findMany({
-    include: {
-      purchase_order: true,
-    },
+export const updateRpoRule = async (
+  id: string,
+  data: Partial<RpoRule>
+): Promise<RpoRule> => {
+  return prisma.rPO_rule.update({
+    where: { RPO_rule_id: id },
+    data,
   });
 };
 
-export const createRpoRules = async (
-  data: Array<{
-    PO_id: string;
-    RPO_number_format: string;
-    final_invoice_label: string;
-    RPO_extension_handling: string;
-    mob_demob_fee_rules: string;
-  }>
-) => {
-  return prisma.$transaction(async (prisma) => {
-    const rpoRules = [];
-    for (const ruleData of data) {
-      const rpoRule = await prisma.rPO_rule.create({
-        data: {
-          purchase_order: { connect: { PO_id: ruleData.PO_id } },
-          RPO_number_format: ruleData.RPO_number_format,
-          final_invoice_label: ruleData.final_invoice_label,
-          RPO_extension_handling: ruleData.RPO_extension_handling,
-          mob_demob_fee_rules: ruleData.mob_demob_fee_rules,
-        },
+export const createRpoRule = async (
+  data: APIRPORuleData | APIRPORuleData[]
+): Promise<RpoRule[]> => {
+  const receivedData: APIRPORuleData[] = Array.isArray(data) ? data : [data];
+
+  return Promise.all(
+    receivedData.map((rule) => {
+      if (rule.RPO_rule_id === "") rule.RPO_rule_id = undefined;
+
+      return prisma.rPO_rule.create({
+        data: rule,
       });
-      rpoRules.push(rpoRule);
-    }
-    return rpoRules;
-  });
+    })
+  );
 };

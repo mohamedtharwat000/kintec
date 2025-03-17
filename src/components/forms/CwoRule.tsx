@@ -2,7 +2,6 @@ import React, { useEffect } from "react";
 import { Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -36,13 +35,14 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { tryCatch } from "@/lib/utils";
 
 const formSchema = z.object({
-  CWO_id: z.string().min(1, "Call-off Work Order ID is required"),
-  CWO_number_format: z.string().optional(),
-  final_invoice_label: z.string().optional(),
-  CWO_extension_handling: z.string().optional(),
-  mob_demob_fee_rules: z.string().optional(),
+  CWO_id: z.string().min(1, "Call-off Work Order is required"),
+  CWO_number_format: z.string().optional().nullable(),
+  final_invoice_label: z.string().optional().nullable(),
+  CWO_extension_handling: z.string().optional().nullable(),
+  mob_demob_fee_rules: z.string().optional().nullable(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -61,11 +61,9 @@ export function CwoRuleForm({
   onSuccess,
 }: CwoRuleFormProps) {
   const isEditing = !!ruleId;
-  const { data: existingRule, isLoading: isLoadingRule } = useCwoRule(
-    ruleId || ""
-  );
-
+  const { data: existingRule, isLoading: isLoadingRule } = useCwoRule(ruleId);
   const { data: calloffWorkOrders = [] } = useCalloffWorkOrders();
+
   const createCwoRule = useCreateCwoRule();
   const updateCwoRule = useUpdateCwoRule();
 
@@ -90,7 +88,6 @@ export function CwoRuleForm({
         mob_demob_fee_rules: existingRule.mob_demob_fee_rules || "",
       });
     } else if (!isEditing && open) {
-      // Reset form when opening in create mode
       form.reset({
         CWO_id: "",
         CWO_number_format: "",
@@ -102,39 +99,41 @@ export function CwoRuleForm({
   }, [existingRule, form, isEditing, open]);
 
   const onSubmit = async (data: FormData) => {
-    try {
+    const { error } = await tryCatch(async () => {
       if (isEditing) {
         await updateCwoRule.mutateAsync({
           id: ruleId!,
+          // @ts-ignore - Backend handles null/undefined fields
           data: {
             ...data,
           },
         });
-        toast.success("Call-off Work Order Rule updated successfully");
+        toast.success("CWO rule updated successfully");
       } else {
+        // @ts-ignore - Backend handles null/undefined fields
         await createCwoRule.mutateAsync({
           ...data,
         });
-        toast.success("Call-off Work Order Rule added successfully");
+        toast.success("CWO rule added successfully");
       }
 
       if (onSuccess) {
         onSuccess();
       }
       onClose();
-    } catch (error) {
+    });
+
+    if (error) {
       console.error(error);
       toast.error(
-        isEditing
-          ? "Failed to update Call-off Work Order Rule"
-          : "Failed to create Call-off Work Order Rule"
+        isEditing ? "Failed to update CWO rule" : "Failed to create CWO rule"
       );
     }
   };
 
   const isSubmitting = createCwoRule.isPending || updateCwoRule.isPending;
 
-  // Filter out CWOs that already have rules assigned
+  // Filter calloff work orders to show only those without rules (except current one when editing)
   const availableCWOs = isEditing
     ? calloffWorkOrders
     : calloffWorkOrders.filter(
@@ -142,18 +141,23 @@ export function CwoRuleForm({
       );
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!isSubmitting && !open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-[80vw] max-h-[80vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>
-            {isEditing
-              ? "Edit Call-off Work Order Rule"
-              : "Add New Call-off Work Order Rule"}
+            {isEditing ? "Edit CWO Rule" : "Add New CWO Rule"}
           </DialogTitle>
           <DialogDescription>
             {isEditing
-              ? "Update call-off work order rule details."
-              : "Enter details for the new call-off work order rule."}
+              ? "Update rule details for call-off work order."
+              : "Define rules for call-off work order processing."}
           </DialogDescription>
         </DialogHeader>
 
@@ -178,13 +182,13 @@ export function CwoRuleForm({
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a call-off work order" />
+                          <SelectValue placeholder="Select a Call-off Work Order" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {availableCWOs.map((cwo) => (
                           <SelectItem key={cwo.CWO_id} value={cwo.CWO_id}>
-                            {cwo.CWO_id} - {cwo.contract?.job_title || "N/A"}
+                            {cwo.contract?.job_title || cwo.CWO_id}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -199,11 +203,12 @@ export function CwoRuleForm({
                 name="CWO_number_format"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Number Format</FormLabel>
+                    <FormLabel>CWO Number Format</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="e.g., CWO-{YYYY}-{0000}"
+                        placeholder="e.g., CWO-YYYY-####"
                         {...field}
+                        value={field.value || ""}
                         disabled={isSubmitting}
                       />
                     </FormControl>
@@ -222,6 +227,7 @@ export function CwoRuleForm({
                       <Input
                         placeholder="e.g., FINAL INVOICE"
                         {...field}
+                        value={field.value || ""}
                         disabled={isSubmitting}
                       />
                     </FormControl>
@@ -235,12 +241,12 @@ export function CwoRuleForm({
                 name="CWO_extension_handling"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Extension Handling</FormLabel>
+                    <FormLabel>CWO Extension Handling</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Enter extension handling rules..."
-                        className="min-h-[100px]"
+                      <Input
+                        placeholder="e.g., Require approval"
                         {...field}
+                        value={field.value || ""}
                         disabled={isSubmitting}
                       />
                     </FormControl>
@@ -256,10 +262,10 @@ export function CwoRuleForm({
                   <FormItem>
                     <FormLabel>Mobilization/Demobilization Fee Rules</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Enter mobilization/demobilization fee rules..."
-                        className="min-h-[100px]"
+                      <Input
+                        placeholder="e.g., One-time fee of £500"
                         {...field}
+                        value={field.value || ""}
                         disabled={isSubmitting}
                       />
                     </FormControl>
@@ -279,11 +285,16 @@ export function CwoRuleForm({
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {isEditing ? "Updating..." : "Saving..."}
+                    </>
                   ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isEditing ? "Update" : "Save"}
+                    </>
                   )}
-                  {isEditing ? "Update" : "Save"}
                 </Button>
               </DialogFooter>
             </form>

@@ -1,21 +1,24 @@
-import { Contract } from "@/types/Contract";
-import { BankDetail } from "@/types/BankDetail";
-import { VisaDetail } from "@/types/VisaDetail";
-import { Submission } from "@/types/Submission";
+import {
+  contractor,
+  bank_detail,
+  visa_detail,
+  contract,
+  submission,
+} from "@prisma/client";
 
-export interface Contractor {
-  contractor_id: string;
-  first_name: string;
-  middle_name?: string;
-  last_name: string;
-  date_of_birth: Date;
-  email_address: string;
-  phone_number: string;
-  nationality: string;
-  address: string;
-  country_of_residence: string;
-  bank_details?: BankDetail[];
-  visa_details?: VisaDetail[];
-  contracts?: Contract[];
-  submissions?: Submission[];
-}
+export type Contractor = contractor;
+
+export type ContractorView = Contractor & {
+  bank_details?: bank_detail[];
+  visa_details?: visa_detail[];
+  contracts?: contract[];
+  submissions?: submission[];
+};
+
+export type MakePropertyOptional<T, K extends keyof T> = Omit<T, K> &
+  Partial<Pick<T, K>>;
+
+export type APIContractorData = MakePropertyOptional<
+  Contractor,
+  "contractor_id"
+>;

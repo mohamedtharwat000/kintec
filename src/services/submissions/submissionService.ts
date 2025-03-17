@@ -1,43 +1,26 @@
 import { prisma } from "@/lib/prisma";
+import {
+  Submission,
+  SubmissionView,
+  APISubmissionData,
+} from "@/types/Submission";
 
-export const createSubmission = async (data: {
-  contractor_id: string;
-  PO_id?: string;
-  CWO_id?: string;
-  billing_period: string;
-  payment_currency: string;
-  invoice_currency: string;
-  invoice_due_date: string;
-  wht_rate?: number;
-  wht_applicable?: boolean;
-  external_assignment?: boolean;
-}) => {
-  if ((!data.PO_id && !data.CWO_id) || (data.PO_id && data.CWO_id)) {
-    throw new Error("Exactly one of PO_id or CWO_id must be provided.");
-  }
-
-  return prisma.submission.create({
-    data: {
-      contractor: { connect: { contractor_id: data.contractor_id } },
-      billing_period: new Date(data.billing_period),
-      payment_currency: data.payment_currency,
-      invoice_currency: data.invoice_currency,
-      invoice_due_date: new Date(data.invoice_due_date),
-      wht_rate: data.wht_rate,
-      wht_applicable: data.wht_applicable,
-      external_assignment: data.external_assignment,
-      ...(data.PO_id
-        ? { purchase_order: { connect: { PO_id: data.PO_id } } }
-        : {}),
-      ...(data.CWO_id
-        ? { calloff_work_order: { connect: { CWO_id: data.CWO_id } } }
-        : {}),
+export const getAllSubmissions = async (): Promise<SubmissionView[]> => {
+  return prisma.submission.findMany({
+    include: {
+      contractor: true,
+      purchase_order: true,
+      calloff_work_order: true,
+      validation_rules: true,
+      reviews: true,
     },
   });
 };
 
-export const getSubmissionById = async (id: string) => {
-  const submission = await prisma.submission.findUnique({
+export const getSubmissionById = async (
+  id: string
+): Promise<SubmissionView | null> => {
+  return prisma.submission.findUnique({
     where: { submission_id: id },
     include: {
       contractor: true,
@@ -47,151 +30,36 @@ export const getSubmissionById = async (id: string) => {
       reviews: true,
     },
   });
-
-  if (!submission) return null;
-
-  if (submission.purchase_order) {
-    const { calloff_work_order, ...rest } = submission;
-    return rest;
-  } else if (submission.calloff_work_order) {
-    const { purchase_order, ...rest } = submission;
-    return rest;
-  }
-  return submission;
 };
 
-export const updateSubmission = async (
-  id: string,
-  data: {
-    contractor_id?: string;
-    PO_id?: string;
-    CWO_id?: string;
-    billing_period?: string;
-    payment_currency?: string;
-    invoice_currency?: string;
-    invoice_due_date?: string;
-    wht_rate?: number;
-    wht_applicable?: boolean;
-    external_assignment?: boolean;
-  }
-) => {
-  if (data.PO_id !== undefined && data.CWO_id !== undefined) {
-    throw new Error("Provide only one of PO_id or CWO_id.");
-  }
-
-  return prisma.submission.update({
-    where: { submission_id: id },
-    data: {
-      ...(data.contractor_id && {
-        contractor: { connect: { contractor_id: data.contractor_id } },
-      }),
-      ...(data.billing_period && {
-        billing_period: new Date(data.billing_period),
-      }),
-      ...(data.payment_currency && { payment_currency: data.payment_currency }),
-      ...(data.invoice_currency && { invoice_currency: data.invoice_currency }),
-      ...(data.invoice_due_date && {
-        invoice_due_date: new Date(data.invoice_due_date),
-      }),
-      ...(data.wht_rate !== undefined && { wht_rate: data.wht_rate }),
-      ...(data.wht_applicable !== undefined && {
-        wht_applicable: data.wht_applicable,
-      }),
-      ...(data.external_assignment !== undefined && {
-        external_assignment: data.external_assignment,
-      }),
-      ...(data.PO_id !== undefined
-        ? { purchase_order: { connect: { PO_id: data.PO_id } } }
-        : {}),
-      ...(data.CWO_id !== undefined
-        ? { calloff_work_order: { connect: { CWO_id: data.CWO_id } } }
-        : {}),
-    },
-  });
-};
-
-export const deleteSubmission = async (id: string) => {
+export const deleteSubmission = async (id: string): Promise<Submission> => {
   return prisma.submission.delete({
     where: { submission_id: id },
   });
 };
 
-export const getAllSubmissions = async () => {
-  const submissions = await prisma.submission.findMany({
-    include: {
-      contractor: true,
-      purchase_order: true,
-      calloff_work_order: true,
-      validation_rules: true,
-      reviews: true,
-    },
-  });
-
-  return submissions.map((submission) => {
-    if (submission.purchase_order) {
-      const { calloff_work_order, ...rest } = submission;
-      return rest;
-    } else if (submission.calloff_work_order) {
-      const { purchase_order, ...rest } = submission;
-      return rest;
-    }
-    return submission;
+export const updateSubmission = async (
+  id: string,
+  data: Partial<Submission>
+): Promise<Submission> => {
+  return prisma.submission.update({
+    where: { submission_id: id },
+    data,
   });
 };
 
-export const createSubmissions = async (
-  data: Array<{
-    contractor_id: string;
-    PO_id?: string;
-    CWO_id?: string;
-    billing_period: string;
-    payment_currency: string;
-    invoice_currency: string;
-    invoice_due_date: string;
-    wht_rate?: number;
-    wht_applicable?: boolean;
-    external_assignment?: boolean;
-  }>
-) => {
-  return prisma.$transaction(async (prisma) => {
-    const submissions = [];
+export const createSubmission = async (
+  data: APISubmissionData | APISubmissionData[]
+): Promise<Submission[]> => {
+  const receivedData: APISubmissionData[] = Array.isArray(data) ? data : [data];
 
-    for (const submissionData of data) {
-      if (
-        (!submissionData.PO_id && !submissionData.CWO_id) ||
-        (submissionData.PO_id && submissionData.CWO_id)
-      ) {
-        throw new Error("Exactly one of PO_id or CWO_id must be provided.");
-      }
+  return Promise.all(
+    receivedData.map((submission) => {
+      if (submission.submission_id === "") submission.submission_id = undefined;
 
-      const submission = await prisma.submission.create({
-        data: {
-          contractor: {
-            connect: { contractor_id: submissionData.contractor_id },
-          },
-          billing_period: new Date(submissionData.billing_period),
-          payment_currency: submissionData.payment_currency,
-          invoice_currency: submissionData.invoice_currency,
-          invoice_due_date: new Date(submissionData.invoice_due_date),
-          wht_rate: submissionData.wht_rate,
-          wht_applicable: submissionData.wht_applicable,
-          external_assignment: submissionData.external_assignment,
-          ...(submissionData.PO_id
-            ? { purchase_order: { connect: { PO_id: submissionData.PO_id } } }
-            : {}),
-          ...(submissionData.CWO_id
-            ? {
-                calloff_work_order: {
-                  connect: { CWO_id: submissionData.CWO_id },
-                },
-              }
-            : {}),
-        },
+      return prisma.submission.create({
+        data: submission,
       });
-
-      submissions.push(submission);
-    }
-
-    return submissions;
-  });
+    })
+  );
 };

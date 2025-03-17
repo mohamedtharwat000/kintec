@@ -41,6 +41,7 @@ import {
   CountryIdType,
   CountryIdStatus,
   VisaDetail,
+  APIVisaDetailData,
 } from "@/types/VisaDetail";
 
 const formSchema = z.object({
@@ -149,11 +150,18 @@ export function VisaDetailForm({
 
   const onSubmit = async (data: FormData) => {
     const { error } = await tryCatch(async () => {
-      const formattedData: Partial<VisaDetail> = {
-        ...data,
+      const formattedData: APIVisaDetailData = {
+        contractor_id: data.contractor_id || "",
+        visa_number: data.visa_number,
+        visa_type: data.visa_type,
+        visa_country: data.visa_country,
+        visa_expiry_date: new Date(data.visa_expiry_date),
         visa_status: data.visa_status as VisaStatus,
-        country_id_status: data.country_id_status as CountryIdStatus,
+        visa_sponsor: data.visa_sponsor || "",
+        country_id_number: data.country_id_number,
         country_id_type: data.country_id_type as CountryIdType,
+        country_id_expiry_date: new Date(data.country_id_expiry_date),
+        country_id_status: data.country_id_status as CountryIdStatus,
       };
       if (isEditing) {
         await updateVisaDetail.mutateAsync({

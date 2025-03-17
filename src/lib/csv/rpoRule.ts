@@ -1,39 +1,30 @@
 import Papa from "papaparse";
-import { RPO_Rule } from "@/types/Orders";
+import { RPO_Rule } from "@/types/PORule";
+import { validateRPORules } from "@/lib/validation/rpoRule";
 
 export interface ParseResult<T> {
   data: T[];
-  errors: Papa.ParseError[];
+  errors: { row: number; error: string }[];
   meta: Papa.ParseMeta;
 }
 
-export function parseRpoRule(
+export function parseRPORule(
   file: File
 ): Promise<ParseResult<Partial<RPO_Rule>>> {
   return new Promise((resolve, reject) => {
     Papa.parse<Partial<RPO_Rule>>(file, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: (header) => {
-        const headerMap: Record<string, string> = {
-          "RPO Rule ID": "RPO_rule_id",
-          "PO ID": "PO_id",
-          "Number Format": "RPO_number_format",
-          "Final Invoice Label": "final_invoice_label",
-          "Extension Handling": "RPO_extension_handling",
-          "Mob/Demob Fee Rules": "mob_demob_fee_rules",
-        };
-
-        return headerMap[header] || header;
-      },
       complete: (results) => {
+        const processedData = results.data;
+        const validationErrors = validateRPORules(processedData);
         resolve({
-          data: results.data,
-          errors: results.errors,
+          data: processedData,
+          errors: validationErrors,
           meta: results.meta,
         });
       },
-      error: (error) => {
+      error(error: Error) {
         reject(error);
       },
     });

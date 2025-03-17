@@ -1,5 +1,16 @@
-import { PurchaseOrder } from "@/types/Orders";
-import { CalloffWorkOrder } from "@/types/Orders";
+import { rate, purchase_order, calloff_work_order } from "@prisma/client";
+
+export type Rate = rate;
+
+export type RateView = Rate & {
+  purchase_order?: purchase_order;
+  calloff_work_order?: calloff_work_order;
+};
+
+export type MakePropertyOptional<T, K extends keyof T> = Omit<T, K> &
+  Partial<Pick<T, K>>;
+
+export type APIRateData = MakePropertyOptional<Rate, "rate_id">;
 
 export enum RateType {
   charged = "charged",
@@ -10,16 +21,4 @@ export enum RateFrequency {
   hourly = "hourly",
   daily = "daily",
   monthly = "monthly",
-}
-
-export interface Rate {
-  rate_id: string;
-  PO_id?: string;
-  CWO_id?: string;
-  rate_type: RateType;
-  rate_frequency: RateFrequency;
-  rate_value: number;
-  rate_currency: string;
-  purchase_order?: PurchaseOrder;
-  calloff_work_order?: CalloffWorkOrder;
 }

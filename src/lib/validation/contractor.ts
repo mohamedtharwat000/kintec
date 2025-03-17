@@ -15,12 +15,10 @@ export const contractorSchema = z.object({
 
 export type ContractorValidation = z.infer<typeof contractorSchema>;
 
-export function validateContractors(data: Partial<Contractor>[]): {
-  validationErrors: { row: number; error: string }[];
-  validData: Partial<Contractor>[];
-} {
+export function validateContractors(
+  data: Partial<Contractor>[]
+): { row: number; error: string }[] {
   const validationErrors: { row: number; error: string }[] = [];
-  const validData: Partial<Contractor>[] = [];
 
   data.forEach((row, index) => {
     const rowNumber = index + 2;
@@ -33,10 +31,8 @@ export function validateContractors(data: Partial<Contractor>[]): {
           error: `${err.path}: ${err.message}`,
         });
       });
-    } else {
-      validData.push(row);
     }
   });
 
-  return { validationErrors, validData };
+  return validationErrors;
 }

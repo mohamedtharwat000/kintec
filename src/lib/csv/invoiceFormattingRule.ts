@@ -1,9 +1,10 @@
 import Papa from "papaparse";
-import { InvoiceFormattingRule } from "@/types/Invoice";
+import { InvoiceFormattingRule } from "@/types/InvoiceFormattingRule";
+import { validateInvoiceFormattingRules } from "@/lib/validation/invoiceFormattingRule";
 
 export interface ParseResult<T> {
   data: T[];
-  errors: Papa.ParseError[];
+  errors: { row: number; error: string }[];
   meta: Papa.ParseMeta;
 }
 
@@ -14,24 +15,16 @@ export function parseInvoiceFormattingRule(
     Papa.parse<Partial<InvoiceFormattingRule>>(file, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: (header) => {
-        const headerMap: Record<string, string> = {
-          "Invoice ID": "invoice_id",
-          "File Format": "file_format",
-          "Required Fields": "required_invoice_fields",
-          "Attachment Requirements": "attachment_requirements",
-        };
-
-        return headerMap[header] || header;
-      },
       complete: (results) => {
+        const processedData = results.data;
+        const validationErrors = validateInvoiceFormattingRules(processedData);
         resolve({
-          data: results.data,
-          errors: results.errors,
+          data: processedData,
+          errors: validationErrors,
           meta: results.meta,
         });
       },
-      error: (error) => {
+      error(error: Error) {
         reject(error);
       },
     });

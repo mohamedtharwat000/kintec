@@ -28,9 +28,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { tryCatch } from "@/lib/utils";
-import { projectSchema } from "@/lib/validation/project";
 
-type FormData = z.infer<typeof projectSchema>;
+const formSchema = z.object({
+  project_name: z.string().min(1, "Project name is required"),
+  project_type: z.string().min(1, "Project type is required"),
+});
+
+type FormData = z.infer<typeof formSchema>;
 
 interface ProjectFormProps {
   projectId?: string;
@@ -54,7 +58,7 @@ export function ProjectForm({
   const updateProject = useUpdateProject();
 
   const form = useForm<FormData>({
-    resolver: zodResolver(projectSchema),
+    resolver: zodResolver(formSchema),
     defaultValues: {
       project_name: "",
       project_type: "",

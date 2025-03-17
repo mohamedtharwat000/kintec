@@ -1,21 +1,21 @@
 import { prisma } from "@/lib/prisma";
-import { object } from "zod";
+import {
+  ClientCompany,
+  ClientCompanyView,
+  APIClientCompanyData,
+} from "@/types/ClientCompany";
 
-export const createClientCompany = async (data: {
-  client_company_id?: string;
-  client_name: string;
-  contact_email: string;
-  invoice_submission_deadline?: string;
-}) => {
-  return prisma.client_company.create({
-    data: {
-      ...data,
-      client_company_id: data.client_company_id || undefined,
+export const getAllClientCompanies = async (): Promise<ClientCompanyView[]> => {
+  return prisma.client_company.findMany({
+    include: {
+      contracts: true,
     },
   });
 };
 
-export const getClientCompanyById = async (id: string) => {
+export const getClientCompanyById = async (
+  id: string
+): Promise<ClientCompanyView | null> => {
   return prisma.client_company.findUnique({
     where: { client_company_id: id },
     include: {
@@ -24,42 +24,41 @@ export const getClientCompanyById = async (id: string) => {
   });
 };
 
-export const updateClientCompany = async (id: string, data: any) => {
+export const deleteClientCompany = async (
+  id: string
+): Promise<ClientCompany> => {
+  return prisma.client_company.delete({
+    where: { client_company_id: id },
+  });
+};
+
+export const updateClientCompany = async (
+  id: string,
+  data: Partial<ClientCompany>
+): Promise<ClientCompany> => {
   return prisma.client_company.update({
     where: { client_company_id: id },
     data,
   });
 };
 
-export const deleteClientCompany = async (id: string) => {
-  return prisma.client_company.delete({
-    where: { client_company_id: id },
-  });
-};
+export const createClientCompany = async (
+  data: APIClientCompanyData | APIClientCompanyData[]
+): Promise<ClientCompany[]> => {
+  const receivedData: APIClientCompanyData[] = Array.isArray(data)
+    ? data
+    : [data];
 
-export const getAllClientCompanies = async () => {
-  return prisma.client_company.findMany({
-    include: {
-      contracts: true,
-    },
-  });
-};
+  return Promise.all(
+    receivedData.map((company) => {
+      if (company.client_company_id === "")
+        company.client_company_id = undefined;
 
-export const createClientCompanies = async (
-  data: Array<{
-    client_company_id?: string;
-    client_name: string;
-    contact_email: string;
-    invoice_submission_deadline?: string;
-  }>
-) => {
-  const companies = [];
+      console.log(company);
 
-  for (const companyData of data) {
-    const compData = { ...companyData, client_company_id: companyData.client_company_id || undefined, }
-    const company = await createClientCompany(compData);
-    companies.push(company);
-  }
-
-  return companies;
+      return prisma.client_company.create({
+        data: company,
+      });
+    })
+  );
 };

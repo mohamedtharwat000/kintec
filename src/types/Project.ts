@@ -1,23 +1,13 @@
-import { Contract } from "@/types/Contract";
+import { project, contract, project_rule } from "@prisma/client";
 
-export interface Project {
-  project_id: string;
-  project_name: string;
-  project_type: string;
-  contracts?: Contract[];
-  project_rules?: ProjectRule[];
-}
+export type Project = project;
 
-export interface ProjectRule {
-  project_rule_id: string;
-  project_id: string;
-  special_project_rules?: string;
-  project_rules_reviewer_name?: string;
-  additional_review_process?: AdditionalReviewProcess;
-  major_project_indicator?: boolean;
-}
+export type ProjectView = Project & {
+  contracts?: contract[];
+  project_rules?: project_rule[];
+};
 
-export enum AdditionalReviewProcess {
-  required = "required",
-  not_required = "not_required",
-}
+export type MakePropertyOptional<T, K extends keyof T> = Omit<T, K> &
+  Partial<Pick<T, K>>;
+
+export type APIProjectData = MakePropertyOptional<Project, "project_id">;

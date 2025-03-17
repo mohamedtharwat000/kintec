@@ -4,6 +4,8 @@ import { useState } from "react";
 import {
   useClients,
   useDeleteClient,
+  useSearchFilter,
+  useParseClientCompanyCsv,
   useCreateClient,
 } from "@/hooks/useClientCompany";
 import { DataTable } from "@/components/dataTable/DataTable";
@@ -12,58 +14,57 @@ import { Button } from "@/components/ui/button";
 import { Plus, Search, Pencil, Trash2, Upload, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ClientForm } from "@/components/forms/ClientCompany";
-import type { ClientCompany as ClientCompanyType } from "@/types/ClientCompany";
-import { toast } from "sonner";
-import { parseClientCompany } from "@/lib/csv/clientCompany";
-import { validateClientCompanies } from "@/lib/validation/clientCompany";
+import { ClientCompanyView } from "@/types/ClientCompany";
+import { CSVPreviewDialog } from "@/components/reusableModels/CSVPreviewDialog";
+import { DeleteConfirmationDialog } from "@/components/reusableModels/DeleteConfirmationDialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { ClientCompanyDetails } from "@/components/detailsDialogs/ClientCompany";
-import { CSVPreviewDialog } from "@/components/csvPreviewDialog/ClientCompany";
-import { tryCatch } from "@/lib/utils";
+  DetailsDialog,
+  DetailSection,
+} from "@/components/reusableModels/DetailsDialog";
+import { toast } from "sonner";
 
 export function ClientCompany() {
-  const { data: clients = [], isLoading } = useClients();
-
+  // Core data fetching hook
+  const { data: clients = [], isLoading, refetch } = useClients();
   const deleteClient = useDeleteClient();
   const createClient = useCreateClient();
+  const parseCSV = useParseClientCompanyCsv();
 
+  // Page-level state management
   const [searchTerm, setSearchTerm] = useState("");
-  const filteredData = clients.filter(
-    (company) =>
-      company.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.contact_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.client_company_id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
+  // Form dialog state
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [clientToDelete, setClientToDelete] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string>();
 
+  // Details dialog state
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [selectedCompanyForDetails, setSelectedCompanyForDetails] = useState<
-    ClientCompanyType | undefined
+    ClientCompanyView | undefined
   >(undefined);
 
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [csvData, setCsvData] = useState<Partial<ClientCompanyType>[]>([]);
-  const [csvFileName, setCsvFileName] = useState("");
-  const [validationErrors, setValidationErrors] = useState<
+  // CSV dialog state
+  const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvValidationErrors, setCsvValidationErrors] = useState<
     { row: number; error: string }[]
   >([]);
 
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<string | null>(null);
+
+  // Filter data based on search term
+  const filteredData = useSearchFilter<ClientCompanyView>(clients, searchTerm, [
+    "client_name",
+    "contact_email",
+    "client_company_id",
+  ]);
+
+  // Simple handlers for UI actions
   const handleAddClick = () => {
-    setSelectedClientId(null);
+    setSelectedClientId(undefined);
     setIsFormDialogOpen(true);
   };
 
@@ -72,7 +73,7 @@ export function ClientCompany() {
     setIsFormDialogOpen(true);
   };
 
-  const handleDetailsClick = (company: ClientCompanyType) => {
+  const handleDetailsClick = (company: ClientCompanyView) => {
     setSelectedCompanyForDetails(company);
     setIsDetailsDialogOpen(true);
   };
@@ -82,63 +83,94 @@ export function ClientCompany() {
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!clientToDelete) return;
-
-    setIsDeleting(true);
-    const { error } = await tryCatch(() =>
-      deleteClient.mutateAsync(clientToDelete)
-    );
-
-    if (error) {
-      toast.error("Failed to delete company" + error.message);
-    } else {
-      toast.success("Company deleted successfully");
-    }
-
-    setIsDeleting(false);
-    setDeleteDialogOpen(false);
-    setClientToDelete(null);
-  };
-
-  const handleFileUpload = async (
+  const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      setUploadFile(file);
 
-    const { data, error } = await tryCatch(() => parseClientCompany(file));
+      const result = await parseCSV(file);
+      if (result.data) {
+        setCsvData(result.data.data);
+        setCsvValidationErrors(result.data.errors);
+        setIsCSVDialogOpen(true);
+      } else if (result.error) {
+        toast.error(`Failed to parse CSV: ${result.error.message}`);
+      }
 
-    if (error) {
-      toast.error("Failed to parse CSV file: " + error.message);
-      return;
-    }
-
-    if (data) {
-      setCsvFileName(file.name);
-      setCsvData(data.data);
-      setValidationErrors(data.errors || []);
-      setIsPreviewOpen(true);
+      event.target.value = "";
     }
   };
 
-  const handleConfirmCsvUpload = async () => {
-    if (validationErrors.length > 0) {
-      toast.error("Please fix validation errors before uploading");
-      return;
-    }
+  const handleCSVDialogClose = () => {
+    setIsCSVDialogOpen(false);
 
-    const { error } = await tryCatch(() => createClient.mutateAsync(csvData));
+    setCsvData([]);
+    setCsvValidationErrors([]);
+    setUploadFile(null);
+  };
 
-    if (error) {
-      toast.error("Failed to import companies from CSV: " + error.message);
-    } else {
+  const handleCsvUpload = async () => {
+    if (!csvData.length) return;
+
+    try {
+      await createClient.mutateAsync(csvData);
       toast.success(`Successfully imported ${csvData.length} companies`);
-      setIsPreviewOpen(false);
+      refetch();
+      setIsCSVDialogOpen(false);
+
+      setCsvData([]);
+      setCsvValidationErrors([]);
+      setUploadFile(null);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to import companies: ${errorMessage}`);
     }
   };
 
-  const columns: ColumnDef<ClientCompanyType>[] = [
+  const handleFormSuccess = () => {
+    refetch();
+    setIsFormDialogOpen(false);
+  };
+
+  // Generate detail sections for the company
+  const getCompanyDetailSections = (): DetailSection[] => {
+    if (!selectedCompanyForDetails) return [];
+
+    return [
+      {
+        title: "Company Information",
+        items: [
+          { label: "ID", value: selectedCompanyForDetails.client_company_id },
+          {
+            label: "Company Name",
+            value: selectedCompanyForDetails.client_name,
+          },
+          {
+            label: "Contact Email",
+            value: (
+              <a
+                href={`mailto:${selectedCompanyForDetails.contact_email}`}
+                className="text-blue-600 hover:underline"
+              >
+                {selectedCompanyForDetails.contact_email}
+              </a>
+            ),
+          },
+          {
+            label: "Invoice Submission Deadline",
+            value:
+              selectedCompanyForDetails.invoice_submission_deadline ||
+              "Not specified",
+          },
+        ],
+      },
+    ];
+  };
+
+  const columns: ColumnDef<ClientCompanyView>[] = [
     {
       accessorKey: "client_company_id",
       header: () => <div className="text-center">Company ID</div>,
@@ -227,7 +259,7 @@ export function ClientCompany() {
           <input
             type="file"
             accept=".csv"
-            onChange={handleFileUpload}
+            onChange={handleFileChange}
             className="hidden"
             id="csv-upload"
           />
@@ -254,68 +286,47 @@ export function ClientCompany() {
 
       {/* Add/Edit Form Dialog */}
       <ClientForm
-        clientId={selectedClientId || undefined}
+        clientId={selectedClientId}
         open={isFormDialogOpen}
-        onClose={() => {
-          setIsFormDialogOpen(false);
-        }}
+        onClose={() => setIsFormDialogOpen(false)}
+        onSuccess={handleFormSuccess}
       />
 
-      {/* Details Dialog */}
-      <ClientCompanyDetails
-        company={selectedCompanyForDetails}
-        open={isDetailsDialogOpen}
-        onClose={() => setIsDetailsDialogOpen(false)}
-      />
+      {/* Details Dialog - Using the reusable component */}
+      {selectedCompanyForDetails && (
+        <DetailsDialog
+          title={selectedCompanyForDetails.client_name}
+          open={isDetailsDialogOpen}
+          onClose={() => setIsDetailsDialogOpen(false)}
+          sections={getCompanyDetailSections()}
+        />
+      )}
 
       {/* CSV Preview Dialog */}
-      <CSVPreviewDialog
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        data={csvData}
-        fileName={csvFileName}
-        onConfirm={handleConfirmCsvUpload}
-        validationErrors={validationErrors}
-      />
+      {uploadFile && (
+        <CSVPreviewDialog
+          isOpen={isCSVDialogOpen}
+          onClose={handleCSVDialogClose}
+          data={csvData}
+          fileName={uploadFile.name}
+          onConfirm={handleCsvUpload}
+          validationErrors={csvValidationErrors}
+          title="Import Companies"
+          description="Review company data before import"
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog
+      <DeleteConfirmationDialog
         open={deleteDialogOpen}
-        onOpenChange={(open) => {
-          if (!isDeleting && !open) {
-            setDeleteDialogOpen(false);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              client company and remove all related data.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-            <AlertDialogCancel className="mt-2 sm:mt-0" disabled={isDeleting}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
-                  Deleting...
-                </>
-              ) : (
-                "Delete"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onClose={() => setDeleteDialogOpen(false)}
+        onDelete={deleteClient.mutateAsync}
+        itemId={clientToDelete}
+        title="Delete Company"
+        description="Are you sure you want to delete this company? This action cannot be undone."
+        successMessage="Company deleted successfully"
+        errorMessage="Failed to delete company"
+      />
     </div>
   );
 }

@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ReviewForm } from "@/components/forms/ReviewForm";
-import { ReviewDetails } from "@/components/detailsDialogs/ReviewDetails";
+import { ReviewDetails } from "@/components/000/ReviewDetails";
 import { CSVPreviewDialog } from "@/components/csvPreviewDialog/Review";
 import { parseReview } from "@/lib/csv/review";
 import { format } from "date-fns";

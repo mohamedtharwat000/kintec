@@ -26,7 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { CSVPreviewDialog } from "@/components/csvPreviewDialog/Invoice";
-import { InvoiceDetails } from "@/components/detailsDialogs/Invoice";
+import { InvoiceDetails } from "@/components/000/Invoice";
 import { InvoiceForm } from "@/components/forms/Invoice";
 
 export function Invoice() {

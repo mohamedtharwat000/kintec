@@ -137,6 +137,7 @@ export function ContractorForm({
       } else {
         await createContractor.mutateAsync({
           ...data,
+          middle_name: data.middle_name || null,
           date_of_birth: new Date(data.date_of_birth),
         });
         toast.success("Contractor added successfully");

@@ -36,6 +36,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { tryCatch } from "@/lib/utils";
 
 const formSchema = z.object({
   expense_id: z.string().min(1, "Expense ID is required"),
@@ -63,7 +64,7 @@ export function ExpenseValidationRuleForm({
 }: ExpenseValidationRuleFormProps) {
   const isEditing = !!ruleId;
   const { data: existingRule, isLoading: isLoadingRule } =
-    useExpenseValidationRule(ruleId || "");
+    useExpenseValidationRule(ruleId);
   const { data: expenses = [] } = useExpenses();
 
   const createRule = useCreateExpenseValidationRule();
@@ -106,23 +107,40 @@ export function ExpenseValidationRuleForm({
   }, [existingRule, form, isEditing, open]);
 
   const onSubmit = async (data: FormData) => {
-    try {
-      if (isEditing) {
+    const { error } = await tryCatch(async () => {
+      if (isEditing && ruleId) {
         await updateRule.mutateAsync({
           id: ruleId,
-          data,
+          data: {
+            ...data,
+            allowable_expense_types: data.allowable_expense_types || null,
+            expense_documentation: data.expense_documentation || null,
+            supporting_documentation_type:
+              data.supporting_documentation_type || null,
+            expense_limit: data.expense_limit || null,
+            reimbursement_rule: data.reimbursement_rule || null,
+          },
         });
         toast.success("Validation rule updated successfully");
       } else {
-        await createRule.mutateAsync(data);
+        await createRule.mutateAsync({
+          ...data,
+          allowable_expense_types: data.allowable_expense_types || null,
+          expense_documentation: data.expense_documentation || null,
+          supporting_documentation_type:
+            data.supporting_documentation_type || null,
+          expense_limit: data.expense_limit || null,
+          reimbursement_rule: data.reimbursement_rule || null,
+        });
         toast.success("Validation rule added successfully");
       }
 
       if (onSuccess) {
         onSuccess();
       }
-      onClose();
-    } catch (error) {
+    });
+
+    if (error) {
       console.error(error);
       toast.error(
         isEditing
@@ -135,8 +153,15 @@ export function ExpenseValidationRuleForm({
   const isSubmitting = createRule.isPending || updateRule.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!isSubmitting && !open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-[80vw] max-h-[80vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Validation Rule" : "Add New Validation Rule"}
@@ -179,7 +204,8 @@ export function ExpenseValidationRuleForm({
                             value={expense.expense_id}
                           >
                             {expense.expense_id.substring(0, 8)}... -{" "}
-                            {expense.expense_type} ({expense.expense_value}{" "}
+                            {expense.expense_type} (
+                            {expense.expense_value.toString()}{" "}
                             {expense.expsense_currency})
                           </SelectItem>
                         ))}
@@ -200,6 +226,8 @@ export function ExpenseValidationRuleForm({
                       <Input
                         placeholder="e.g., travel, meals, accommodation"
                         {...field}
+                        value={field.value || ""}
+                        disabled={isSubmitting}
                       />
                     </FormControl>
                     <FormMessage />
@@ -218,6 +246,8 @@ export function ExpenseValidationRuleForm({
                         <Input
                           placeholder="e.g., receipt, invoice"
                           {...field}
+                          value={field.value || ""}
+                          disabled={isSubmitting}
                         />
                       </FormControl>
                       <FormMessage />
@@ -235,6 +265,8 @@ export function ExpenseValidationRuleForm({
                         <Input
                           placeholder="e.g., approval form, expense report"
                           {...field}
+                          value={field.value || ""}
+                          disabled={isSubmitting}
                         />
                       </FormControl>
                       <FormMessage />
@@ -253,6 +285,8 @@ export function ExpenseValidationRuleForm({
                       <Input
                         placeholder="e.g., 1000 USD per month"
                         {...field}
+                        value={field.value || ""}
+                        disabled={isSubmitting}
                       />
                     </FormControl>
                     <FormMessage />
@@ -271,6 +305,8 @@ export function ExpenseValidationRuleForm({
                         placeholder="Enter reimbursement rules and guidelines..."
                         className="min-h-20"
                         {...field}
+                        value={field.value || ""}
+                        disabled={isSubmitting}
                       />
                     </FormControl>
                     <FormMessage />
@@ -278,7 +314,7 @@ export function ExpenseValidationRuleForm({
                 )}
               />
 
-              <DialogFooter className="mt-6">
+              <DialogFooter className="pt-4">
                 <Button
                   variant="outline"
                   onClick={onClose}
@@ -289,11 +325,16 @@ export function ExpenseValidationRuleForm({
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {isEditing ? "Updating..." : "Saving..."}
+                    </>
                   ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isEditing ? "Update" : "Save"}
+                    </>
                   )}
-                  {isEditing ? "Update" : "Save"}
                 </Button>
               </DialogFooter>
             </form>

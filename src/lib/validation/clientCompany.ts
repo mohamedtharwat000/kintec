@@ -4,17 +4,15 @@ import { ClientCompany } from "@/types/ClientCompany";
 export const clientCompanySchema = z.object({
   client_name: z.string().min(1, "Company name is required"),
   contact_email: z.string().email("Invalid email address"),
-  invoice_submission_deadline: z.string().optional(),
+  invoice_submission_deadline: z.string().nullable().optional(),
 });
 
 export type ClientCompanyValidation = z.infer<typeof clientCompanySchema>;
 
-export function validateClientCompanies(data: Partial<ClientCompany>[]): {
-  validationErrors: { row: number; error: string }[];
-  validData: Partial<ClientCompany>[];
-} {
+export function validateClientCompanies(
+  data: Partial<ClientCompany>[]
+): { row: number; error: string }[] {
   const validationErrors: { row: number; error: string }[] = [];
-  const validData: Partial<ClientCompany>[] = [];
 
   data.forEach((row, index) => {
     const rowNumber = index + 2;
@@ -27,10 +25,8 @@ export function validateClientCompanies(data: Partial<ClientCompany>[]): {
           error: `${err.path}: ${err.message}`,
         });
       });
-    } else {
-      validData.push(row);
     }
   });
 
-  return { validationErrors, validData };
+  return validationErrors;
 }

@@ -5,6 +5,8 @@ import {
   useCalloffWorkOrders,
   useDeleteCalloffWorkOrder,
   useCreateCalloffWorkOrder,
+  useSearchFilter,
+  useParseCalloffWorkOrderCsv,
 } from "@/hooks/useCalloffWorkOrders";
 import { DataTable } from "@/components/dataTable/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
@@ -13,47 +15,62 @@ import { Plus, Search, Pencil, Trash2, Upload, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { CalloffWorkOrderForm } from "@/components/forms/CalloffWorkOrder";
 import { Badge } from "@/components/ui/badge";
-import type { CalloffWorkOrder as CalloffWorkOrderType } from "@/types/Orders";
+import { CalloffWorkOrderView, PO_Status } from "@/types/CalloffWorkOrder";
 import { toast } from "sonner";
-import { parseCalloffWorkOrder } from "@/lib/csv/calloffWorkOrder";
+import { CSVPreviewDialog } from "@/components/reusableModels/CSVPreviewDialog";
+import { DeleteConfirmationDialog } from "@/components/reusableModels/DeleteConfirmationDialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { CalloffWorkOrderDetails } from "@/components/detailsDialogs/CalloffWorkOrder";
-import { CSVPreviewDialog } from "@/components/csvPreviewDialog/CalloffWorkOrder";
+  DetailsDialog,
+  DetailSection,
+} from "@/components/reusableModels/DetailsDialog";
+import { format } from "date-fns";
 
 export function CalloffWorkOrder() {
-  const { data: calloffWorkOrders = [], isLoading } = useCalloffWorkOrders();
+  // Core data fetching hook
+  const {
+    data: calloffWorkOrders = [],
+    isLoading,
+    refetch,
+  } = useCalloffWorkOrders();
   const deleteCalloffWorkOrder = useDeleteCalloffWorkOrder();
   const createCalloffWorkOrder = useCreateCalloffWorkOrder();
+  const parseCSV = useParseCalloffWorkOrderCsv();
 
+  // Page-level state management
   const [searchTerm, setSearchTerm] = useState("");
-  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedCWOId, setSelectedCWOId] = useState<string | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [cwoToDelete, setCwoToDelete] = useState<string | null>(null);
-  const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
-  const [selectedCWO, setSelectedCWO] = useState<CalloffWorkOrderType | null>(
-    null
-  );
 
-  // CSV upload state
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [csvData, setCsvData] = useState<Partial<CalloffWorkOrderType>[]>([]);
-  const [csvFileName, setCsvFileName] = useState("");
-  const [validationErrors, setValidationErrors] = useState<
+  // Form dialog state
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [selectedCWOId, setSelectedCWOId] = useState<string | undefined>();
+
+  // Details dialog state
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [selectedCWOForDetails, setSelectedCWOForDetails] = useState<
+    CalloffWorkOrderView | undefined
+  >(undefined);
+
+  // CSV dialog state
+  const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvValidationErrors, setCsvValidationErrors] = useState<
     { row: number; error: string }[]
   >([]);
 
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [cwoToDelete, setCwoToDelete] = useState<string | null>(null);
+
+  // Filter data based on search term
+  const filteredData = useSearchFilter<CalloffWorkOrderView>(
+    calloffWorkOrders,
+    searchTerm,
+    ["CWO_id", "contract_id", "CWO_status", "kintec_email_for_remittance"]
+  );
+
+  // Simple handlers for UI actions
   const handleAddClick = () => {
-    setSelectedCWOId(null);
+    setSelectedCWOId(undefined);
     setIsFormDialogOpen(true);
   };
 
@@ -62,9 +79,9 @@ export function CalloffWorkOrder() {
     setIsFormDialogOpen(true);
   };
 
-  const handleViewDetails = (cwo: CalloffWorkOrderType) => {
-    setSelectedCWO(cwo);
-    setViewDetailsOpen(true);
+  const handleDetailsClick = (cwo: CalloffWorkOrderView) => {
+    setSelectedCWOForDetails(cwo);
+    setIsDetailsDialogOpen(true);
   };
 
   const handleDeleteClick = (cwoId: string) => {
@@ -72,119 +89,208 @@ export function CalloffWorkOrder() {
     setDeleteDialogOpen(true);
   };
 
-  const handleFormClose = () => {
-    setIsFormDialogOpen(false);
-  };
-
-  const handleFormSuccess = () => {
-    setIsFormDialogOpen(false);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!cwoToDelete) return;
-
-    try {
-      await deleteCalloffWorkOrder.mutateAsync(cwoToDelete);
-      toast.success("Call-off Work Order deleted successfully");
-    } catch (error) {
-      toast.error("Failed to delete Call-off Work Order");
-    } finally {
-      setDeleteDialogOpen(false);
-      setCwoToDelete(null);
-    }
-  };
-
-  const handleFileUpload = async (
+  const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      setUploadFile(file);
 
-    try {
-      const result = await parseCalloffWorkOrder(file);
-      setCsvFileName(file.name);
-      setCsvData(result.data);
+      const result = await parseCSV(file);
+      if (result.data) {
+        setCsvData(result.data.data);
+        setCsvValidationErrors(result.data.errors);
+        setIsCSVDialogOpen(true);
+      } else if (result.error) {
+        toast.error(`Failed to parse CSV: ${result.error.message}`);
+      }
 
-      // Validate data
-      const errors: { row: number; error: string }[] = [];
-      result.data.forEach((item, index) => {
-        if (!item.contract_id) {
-          errors.push({ row: index + 1, error: "Contract ID is required" });
-        }
-        if (!item.CWO_start_date) {
-          errors.push({ row: index + 1, error: "Start Date is required" });
-        }
-        if (!item.CWO_end_date) {
-          errors.push({ row: index + 1, error: "End Date is required" });
-        }
-        if (!item.CWO_total_value) {
-          errors.push({ row: index + 1, error: "Total Value is required" });
-        }
-      });
-
-      setValidationErrors(errors);
-
-      // Show preview dialog
-      setIsPreviewOpen(true);
-    } catch (error) {
-      console.error("Error parsing CSV:", error);
-      toast.error("Failed to parse CSV file");
-    } finally {
-      // Reset the file input
       event.target.value = "";
     }
   };
 
-  // Handle CSV data import confirmation
-  const handleConfirmCsvUpload = async () => {
-    try {
-      // Process each call-off work order one by one
-      for (const cwo of csvData) {
-        await createCalloffWorkOrder.mutateAsync(cwo as any);
-      }
+  const handleCSVDialogClose = () => {
+    setIsCSVDialogOpen(false);
+    setCsvData([]);
+    setCsvValidationErrors([]);
+    setUploadFile(null);
+  };
 
+  const handleCsvUpload = async () => {
+    if (!csvData.length) return;
+
+    try {
+      await createCalloffWorkOrder.mutateAsync(csvData);
       toast.success(
         `Successfully imported ${csvData.length} call-off work orders`
       );
-      return Promise.resolve();
+      refetch();
+      setIsCSVDialogOpen(false);
+
+      setCsvData([]);
+      setCsvValidationErrors([]);
+      setUploadFile(null);
     } catch (error) {
-      console.error("Error importing CSV data:", error);
-      toast.error("Failed to import call-off work orders from CSV");
-      return Promise.reject(error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to import call-off work orders: ${errorMessage}`);
     }
   };
 
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+  const handleFormSuccess = () => {
+    refetch();
+    setIsFormDialogOpen(false);
   };
 
-  const formatCurrency = (value: number) => {
+  // Helper function to safely convert any value to a number
+  const safelyParseNumber = (value: any): number => {
+    if (typeof value === "number") return value;
+    if (value === null || value === undefined) return 0;
+    // Handle Decimal objects from Prisma
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "toNumber" in value &&
+      typeof value.toNumber === "function"
+    ) {
+      return value.toNumber();
+    }
+    return Number(value) || 0;
+  };
+
+  // Generate detail sections for the CWO
+  const getCWODetailSections = (): DetailSection[] => {
+    if (!selectedCWOForDetails) return [];
+
+    const formatDate = (date: Date) => format(new Date(date), "PPP");
+    const formatCurrency = (value: any) =>
+      new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format(safelyParseNumber(value));
+
+    return [
+      {
+        title: "Call-off Work Order Information",
+        items: [
+          { label: "CWO ID", value: selectedCWOForDetails.CWO_id },
+          { label: "Contract ID", value: selectedCWOForDetails.contract_id },
+          {
+            label: "Start Date",
+            value: formatDate(selectedCWOForDetails.CWO_start_date),
+          },
+          {
+            label: "End Date",
+            value: formatDate(selectedCWOForDetails.CWO_end_date),
+          },
+          {
+            label: "Total Value",
+            value: formatCurrency(selectedCWOForDetails.CWO_total_value),
+          },
+          {
+            label: "Status",
+            value: (
+              <Badge
+                className={getStatusColor(
+                  selectedCWOForDetails.CWO_status as PO_Status
+                )}
+              >
+                {selectedCWOForDetails.CWO_status}
+              </Badge>
+            ),
+          },
+          {
+            label: "Remittance Email",
+            value: (
+              <a
+                href={`mailto:${selectedCWOForDetails.kintec_email_for_remittance}`}
+                className="text-blue-600 hover:underline"
+              >
+                {selectedCWOForDetails.kintec_email_for_remittance}
+              </a>
+            ),
+          },
+        ],
+      },
+      ...(selectedCWOForDetails.contract
+        ? [
+            {
+              title: "Related Contract",
+              items: [
+                {
+                  label: "Job Title",
+                  value: selectedCWOForDetails.contract.job_title,
+                },
+                {
+                  label: "Job Number",
+                  value: selectedCWOForDetails.contract.job_number,
+                },
+                {
+                  label: "Job Type",
+                  value: selectedCWOForDetails.contract.job_type,
+                },
+                {
+                  label: "Contract Status",
+                  value: (
+                    <Badge>
+                      {selectedCWOForDetails.contract.contract_status}
+                    </Badge>
+                  ),
+                },
+              ],
+            },
+          ]
+        : []),
+    ];
+  };
+
+  const formatDate = (date: Date) => {
+    return format(new Date(date), "PP");
+  };
+
+  const formatCurrency = (value: any) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
-    }).format(value);
+    }).format(safelyParseNumber(value));
   };
 
-  const columns: ColumnDef<CalloffWorkOrderType>[] = [
+  const getStatusColor = (status: PO_Status) => {
+    const colorMap: Record<PO_Status, string> = {
+      active: "bg-green-500 hover:bg-green-600",
+      expired: "bg-gray-500 hover:bg-gray-600",
+      cancelled: "bg-red-500 hover:bg-red-600",
+    };
+    return colorMap[status] || "bg-blue-500 hover:bg-blue-600";
+  };
+
+  const columns: ColumnDef<CalloffWorkOrderView>[] = [
     {
       accessorKey: "CWO_id",
       header: "CWO ID",
       cell: ({ row }) => (
-        <div className="font-mono text-xs">{row.getValue("CWO_id")}</div>
+        <div className="font-medium truncate max-w-[120px] md:max-w-none">
+          {row.getValue("CWO_id")}
+        </div>
       ),
     },
     {
       accessorKey: "contract_id",
-      header: "Contract",
+      header: "Contract ID",
+      cell: ({ row }) => (
+        <div className="truncate max-w-[120px] md:max-w-none">
+          {row.getValue("contract_id")}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "contract",
+      header: "Job Title",
       cell: ({ row }) => {
         const contract = row.original.contract;
         return (
-          <div>
-            {contract ? contract.job_title : row.getValue("contract_id")}
+          <div className="truncate max-w-[150px] md:max-w-none">
+            {contract ? contract.job_title : "N/A"}
           </div>
         );
       },
@@ -193,22 +299,20 @@ export function CalloffWorkOrder() {
       accessorKey: "CWO_status",
       header: "Status",
       cell: ({ row }) => {
-        const status = row.getValue("CWO_status") as string;
-        const colorMap: Record<string, string> = {
-          active: "bg-green-500",
-          expired: "bg-gray-500",
-          cancelled: "bg-red-500",
-        };
-
+        const status = row.getValue("CWO_status") as PO_Status;
         return (
-          <Badge
-            className={`${colorMap[status] || "bg-blue-500"} hover:${
-              colorMap[status] || "bg-blue-500"
-            }`}
-          >
-            {status}
+          <Badge className={getStatusColor(status)}>
+            {status.charAt(0).toUpperCase() + status.slice(1)}
           </Badge>
         );
+      },
+    },
+    {
+      accessorKey: "CWO_total_value",
+      header: "Total Value",
+      cell: ({ row }) => {
+        const value = row.original.CWO_total_value;
+        return <div>{formatCurrency(value)}</div>;
       },
     },
     {
@@ -226,88 +330,73 @@ export function CalloffWorkOrder() {
       },
     },
     {
-      accessorKey: "CWO_total_value",
-      header: "Total Value",
-      cell: ({ row }) => {
-        return <div>{formatCurrency(row.getValue("CWO_total_value"))}</div>;
-      },
-    },
-    {
       id: "actions",
       header: "Actions",
-      cell: ({ row }) => (
-        <div className="flex space-x-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleEditClick(row.original.CWO_id)}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleDeleteClick(row.original.CWO_id)}
-          >
-            <Trash2 className="h-4 w-4 text-red-500" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleViewDetails(row.original)}
-          >
-            <Info className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
+      cell: ({ row }) => {
+        return (
+          <div className="flex justify-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleEditClick(row.original.CWO_id)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleDeleteClick(row.original.CWO_id)}
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleDetailsClick(row.original)}
+            >
+              <Info className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
     },
   ];
 
-  const filteredData = calloffWorkOrders.filter(
-    (cwo) =>
-      cwo.CWO_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (cwo.contract?.job_title || "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      cwo.CWO_status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cwo.kintec_email_for_remittance
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase())
-  );
-
   return (
-    <div className="p-8">
-      <div className="mb-8 flex justify-between items-center">
-        <h1 className="text-2xl font-semibold">
-          Call-off Work Order Management
-        </h1>
-        <div className="flex gap-2">
-          <div className="relative">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleFileUpload}
-              className="hidden"
-              id="csv-upload"
-            />
-            <Button
-              variant="outline"
-              onClick={() => document.getElementById("csv-upload")?.click()}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Upload CSV
-            </Button>
-          </div>
-          <Button onClick={handleAddClick}>
+    <div className="flex flex-col gap-4 p-4">
+      <h1 className="text-xl sm:text-2xl font-semibold">
+        Call-off Work Orders
+      </h1>
+      <div className="flex flex-wrap justify-between items-center gap-2">
+        <div className="relative flex flex-1 items-center gap-2">
+          <Button
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={handleAddClick}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Call-off Work Order
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => document.getElementById("csv-upload")?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Upload CSV
+          </Button>
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleFileChange}
+            className="hidden"
+            id="csv-upload"
+          />
         </div>
-      </div>
 
-      <div className="mb-6 flex gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <div className="relative flex flex-1 items-center justify-center gap-2 p-2 min-w-16">
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
           <Input
             className="pl-10"
             placeholder="Search call-off work orders..."
@@ -317,6 +406,7 @@ export function CalloffWorkOrder() {
         </div>
       </div>
 
+      {/* Data Table */}
       <DataTable
         columns={columns}
         data={filteredData}
@@ -326,51 +416,46 @@ export function CalloffWorkOrder() {
 
       {/* Add/Edit Form Dialog */}
       <CalloffWorkOrderForm
-        cwoId={selectedCWOId || undefined}
+        cwoId={selectedCWOId}
         open={isFormDialogOpen}
-        onClose={handleFormClose}
+        onClose={() => setIsFormDialogOpen(false)}
         onSuccess={handleFormSuccess}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              call-off work order and may affect related records.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Details Dialog */}
-      {viewDetailsOpen && selectedCWO && (
-        <CalloffWorkOrderDetails
-          calloffWorkOrder={selectedCWO}
-          open={viewDetailsOpen}
-          onClose={() => setViewDetailsOpen(false)}
+      {selectedCWOForDetails && (
+        <DetailsDialog
+          title={`Call-off Work Order: ${selectedCWOForDetails.CWO_id}`}
+          open={isDetailsDialogOpen}
+          onClose={() => setIsDetailsDialogOpen(false)}
+          sections={getCWODetailSections()}
         />
       )}
 
       {/* CSV Preview Dialog */}
-      <CSVPreviewDialog
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        data={csvData}
-        fileName={csvFileName}
-        onConfirm={handleConfirmCsvUpload}
-        validationErrors={validationErrors}
+      {uploadFile && (
+        <CSVPreviewDialog
+          isOpen={isCSVDialogOpen}
+          onClose={handleCSVDialogClose}
+          data={csvData}
+          fileName={uploadFile.name}
+          onConfirm={handleCsvUpload}
+          validationErrors={csvValidationErrors}
+          title="Import Call-off Work Orders"
+          description="Review call-off work order data before import"
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onDelete={deleteCalloffWorkOrder.mutateAsync}
+        itemId={cwoToDelete}
+        title="Delete Call-off Work Order"
+        description="Are you sure you want to delete this call-off work order? This action cannot be undone."
+        successMessage="Call-off work order deleted successfully"
+        errorMessage="Failed to delete call-off work order"
       />
     </div>
   );

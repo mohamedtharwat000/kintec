@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import {
   getAllContracts,
   createContract,
-  createContracts,
 } from "@/services/contracts/contractService";
+import { APIContractData } from "@/types/Contract";
 
 export async function GET() {
   try {
@@ -20,21 +21,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const contractsData = Array.isArray(body) ? body : [body];
+    const requestData: APIContractData | APIContractData[] =
+      await request.json();
+    const contracts = await createContract(requestData);
 
-    const newContracts = await createContracts(contractsData);
-
-    return NextResponse.json(newContracts, { status: 201 });
-  } catch (error: any) {
-    console.error(error.code);
-    //Contract does not point at a contractor, client_company or a project
-    if (error instanceof Error && "code" in error && error.code === "P2025") {
-      return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
+    return NextResponse.json(contracts, { status: 201 });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    } else {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
   }
 }

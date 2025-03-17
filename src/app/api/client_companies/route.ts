@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import {
   getAllClientCompanies,
-  createClientCompanies,
+  createClientCompany,
 } from "@/services/client_companies/clientCompanyService";
+import { APIClientCompanyData } from "@/types/ClientCompany";
 
 export async function GET() {
   try {
@@ -19,20 +21,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const companiesData = Array.isArray(body) ? body : [body];
+    const requestData: APIClientCompanyData | APIClientCompanyData[] =
+      await request.json();
+    const client_companies = await createClientCompany(requestData);
 
-    const newClientCompanies = await createClientCompanies(companiesData);
-
-    return NextResponse.json(newClientCompanies, { status: 201 });
-  } catch (error: any) {
-    if (error instanceof Error && "code" in error && error.code === "P2002") {
-      return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
+    return NextResponse.json(client_companies, { status: 201 });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    } else {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
-
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
   }
 }

@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import {
   getAllExpenses,
   createExpense,
 } from "@/services/expenses/expenseService";
+import { APIExpenseData } from "@/types/Expense";
 
 export async function GET() {
   try {
-    const rates = await getAllExpenses();
-    return NextResponse.json(rates, { status: 200 });
+    const expenses = await getAllExpenses();
+    return NextResponse.json(expenses, { status: 200 });
   } catch (error) {
     console.error(error);
     return NextResponse.json(
@@ -19,18 +21,17 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const newExpense = await createExpense(body);
-    return NextResponse.json(newExpense, { status: 201 });
-  } catch (error: any) {
-    console.error(error.code);
+    const requestData: APIExpenseData | APIExpenseData[] = await request.json();
+    const expenses = await createExpense(requestData);
 
-    //    if (error instanceof Error && "code" in error && error.code === "P2014") {
-    //        return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
-    //      }
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json(expenses, { status: 201 });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    } else {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
+    }
   }
 }

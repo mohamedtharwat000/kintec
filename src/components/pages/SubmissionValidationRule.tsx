@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { SubmissionValidationRuleForm } from "@/components/forms/SubmissionValidationRuleForm";
-import { SubmissionValidationRuleDetails } from "@/components/detailsDialogs/SubmissionValidationRuleDetails";
+import { SubmissionValidationRuleDetails } from "@/components/000/SubmissionValidationRuleDetails";
 import { CSVPreviewDialog } from "@/components/csvPreviewDialog/SubmissionValidationRule";
 import { parseSubmissionValidationRule } from "@/lib/csv/submissionValidationRule";
 

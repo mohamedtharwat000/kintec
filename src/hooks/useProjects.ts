@@ -1,51 +1,48 @@
 import axiosClient from "@/lib/axios";
 import { tryCatch } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Project } from "@/types/Project";
+import { Project, ProjectView, APIProjectData } from "@/types/Project";
+import { parseProject } from "@/lib/csv/project";
 
 export function useProjects() {
-  return useQuery<Project[]>({
+  return useQuery<ProjectView[]>({
     queryKey: ["projects"],
     queryFn: async () => {
-      const { data } = await axiosClient.get<Project[]>("/api/projects");
+      const { data } = await axiosClient.get<ProjectView[]>("/api/projects");
       return data;
     },
   });
 }
 
-export function useProject(id: string) {
-  return useQuery<Project>({
+export function useProject(id?: string) {
+  return useQuery<ProjectView>({
     queryKey: ["projects", id],
     queryFn: async () => {
-      const { data } = await axiosClient.get<Project>(`/api/projects/${id}`);
+      const { data } = await axiosClient.get<ProjectView>(
+        `/api/projects/${id}`
+      );
       return data;
     },
     enabled: !!id,
   });
 }
 
-export function useCreateProject() {
+export function useDeleteProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (newProjects: Partial<Project> | Partial<Project>[]) => {
-      const projectsArray = Array.isArray(newProjects)
-        ? newProjects
-        : [newProjects];
-
+    mutationFn: async (id: string) => {
       const result = await tryCatch(async () => {
-        const { data } = await axiosClient.post<Project[]>(
-          "/api/projects",
-          projectsArray
-        );
-        return data;
+        await axiosClient.delete(`/api/projects/${id}`);
+        return true;
       });
 
       if (result.error) throw result.error;
-      return Array.isArray(newProjects) ? result.data! : result.data![0];
+      return result.data!;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
     },
   });
 }
@@ -79,21 +76,55 @@ export function useUpdateProject() {
   });
 }
 
-export function useDeleteProject() {
+export function useCreateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (newProjects: APIProjectData | APIProjectData[]) => {
       const result = await tryCatch(async () => {
-        await axiosClient.delete(`/api/projects/${id}`);
-        return true;
+        const { data } = await axiosClient.post<Project[]>(
+          "/api/projects",
+          newProjects
+        );
+        return data;
       });
 
       if (result.error) throw result.error;
-      return result.data!;
+      return Array.isArray(newProjects) ? result.data! : result.data![0];
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
+}
+
+export function useParseProjectCsv() {
+  return async (file: File) => {
+    const { data, error } = await tryCatch(async () => {
+      const result = await parseProject(file);
+      return result;
+    });
+    if (error) return { error };
+    return { data };
+  };
+}
+
+export function useSearchFilter<T extends Record<string, any>>(
+  data: T[],
+  searchTerm: string,
+  searchFields: (keyof T)[]
+): T[] {
+  if (!searchTerm.trim()) return data;
+
+  const lowercaseSearchTerm = searchTerm.toLowerCase();
+
+  return data.filter((item) =>
+    searchFields.some((field) => {
+      const fieldValue = item[field];
+      return (
+        fieldValue &&
+        String(fieldValue).toLowerCase().includes(lowercaseSearchTerm)
+      );
+    })
+  );
 }

@@ -1,16 +1,11 @@
-export interface Review {
-  review_id: string;
-  submission_id: string;
-  special_review_required: boolean;
-  reviewer_name: string;
-  review_status: ReviewStatus;
-  review_timestamp: Date;
-  review_rejection_reason?: string;
-  overall_validation_status: OverallValidationStatus;
-  last_overall_validation_date: Date;
-  updated_by: string;
-  notes?: string;
-}
+import { review } from "@prisma/client";
+
+export type Review = review;
+
+export type MakePropertyOptional<T, K extends keyof T> = Omit<T, K> &
+  Partial<Pick<T, K>>;
+
+export type APIReviewData = MakePropertyOptional<Review, "review_id">;
 
 export enum ReviewStatus {
   pending = "pending",

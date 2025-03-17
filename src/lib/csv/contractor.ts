@@ -4,7 +4,6 @@ import { validateContractors } from "@/lib/validation/contractor";
 
 export interface ParseResult<T> {
   data: T[];
-  dataToUpload?: Partial<Contractor>[];
   errors: { row: number; error: string }[];
   meta: Papa.ParseMeta;
 }
@@ -18,11 +17,9 @@ export function parseContractor(
       skipEmptyLines: true,
       complete: (results) => {
         const processedData = results.data;
-        const { validationErrors, validData } =
-          validateContractors(processedData);
+        const validationErrors = validateContractors(processedData);
         resolve({
           data: processedData,
-          dataToUpload: validData,
           errors: validationErrors,
           meta: results.meta,
         });

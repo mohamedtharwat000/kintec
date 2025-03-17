@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import {
   getAllContractors,
-  createContractors,
+  createContractor,
 } from "@/services/contractors/contractorService";
+import { APIContractorData } from "@/types/Contractor";
 
 export async function GET() {
   try {
@@ -19,20 +21,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const contractorsData = Array.isArray(body) ? body : [body];
+    const requestData: APIContractorData | APIContractorData[] =
+      await request.json();
+    const contractors = await createContractor(requestData);
 
-    const newContractors = await createContractors(contractorsData);
-
-    return NextResponse.json(newContractors, { status: 201 });
-  } catch (error: any) {
-    if (error instanceof Error && "code" in error && error.code === "P2002") {
-      return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
+    return NextResponse.json(contractors, { status: 201 });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    } else {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
-
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
   }
 }

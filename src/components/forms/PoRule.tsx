@@ -36,6 +36,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { tryCatch } from "@/lib/utils";
 
 const formSchema = z.object({
   PO_id: z.string().min(1, "Purchase Order ID is required"),
@@ -64,7 +65,6 @@ export function PoRuleForm({
   const { data: existingRule, isLoading: isLoadingRule } = useRpoRule(
     ruleId || ""
   );
-
   const { data: purchaseOrders = [] } = usePurchaseOrders();
   const createRpoRule = useCreateRpoRule();
   const updateRpoRule = useUpdateRpoRule();
@@ -102,18 +102,20 @@ export function PoRuleForm({
   }, [existingRule, form, isEditing, open]);
 
   const onSubmit = async (data: FormData) => {
-    try {
+    const { error } = await tryCatch(async () => {
       if (isEditing) {
         await updateRpoRule.mutateAsync({
           id: ruleId!,
-          data: {
-            ...data,
-          },
+          data,
         });
         toast.success("Purchase Order Rule updated successfully");
       } else {
         await createRpoRule.mutateAsync({
           ...data,
+          RPO_number_format: data.RPO_number_format || null,
+          final_invoice_label: data.final_invoice_label || null,
+          RPO_extension_handling: data.RPO_extension_handling || null,
+          mob_demob_fee_rules: data.mob_demob_fee_rules || null,
         });
         toast.success("Purchase Order Rule added successfully");
       }
@@ -122,7 +124,9 @@ export function PoRuleForm({
         onSuccess();
       }
       onClose();
-    } catch (error) {
+    });
+
+    if (error) {
       console.error(error);
       toast.error(
         isEditing
@@ -140,8 +144,15 @@ export function PoRuleForm({
     : purchaseOrders.filter((po) => !po.RPO_rules || po.RPO_rules.length === 0);
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!isSubmitting && !open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-[80vw] max-h-[80vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing
@@ -277,11 +288,16 @@ export function PoRuleForm({
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {isEditing ? "Updating..." : "Saving..."}
+                    </>
                   ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isEditing ? "Update" : "Save"}
+                    </>
                   )}
-                  {isEditing ? "Update" : "Save"}
                 </Button>
               </DialogFooter>
             </form>

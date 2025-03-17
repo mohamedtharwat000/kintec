@@ -14,10 +14,7 @@ export async function GET(
 
     const project = await getProjectById(params.project_id);
     if (!project) {
-      return NextResponse.json(
-        { error: "Contractor not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
     return NextResponse.json(project, { status: 200 });
   } catch (error) {
@@ -54,7 +51,6 @@ export async function DELETE(
   try {
     const params = await context.params;
     await deleteProject(params.project_id);
-    // 204 responses typically have no body.
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error(error);

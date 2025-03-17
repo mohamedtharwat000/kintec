@@ -1,22 +1,18 @@
-export interface VisaDetail {
-  visa_detail_id: string;
-  contractor_id: string;
-  visa_number: string;
-  visa_type: string;
-  visa_country: string;
-  visa_expiry_date: Date | string;
-  visa_status: VisaStatus;
-  visa_sponsor: string;
-  country_id_number: string;
-  country_id_type: CountryIdType;
-  country_id_expiry_date: Date | string;
-  country_id_status: CountryIdStatus;
-  contractor?: {
-    contractor_id: string;
-    first_name: string;
-    last_name: string;
-  };
-}
+import { visa_detail, contractor } from "@prisma/client";
+
+export type VisaDetail = visa_detail;
+
+export type VisaDetailView = VisaDetail & {
+  contractor?: contractor;
+};
+
+export type MakePropertyOptional<T, K extends keyof T> = Omit<T, K> &
+  Partial<Pick<T, K>>;
+
+export type APIVisaDetailData = MakePropertyOptional<
+  VisaDetail,
+  "visa_detail_id"
+>;
 
 export enum VisaStatus {
   active = "active",

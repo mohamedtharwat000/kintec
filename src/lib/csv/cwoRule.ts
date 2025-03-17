@@ -1,39 +1,30 @@
 import Papa from "papaparse";
-import { CWO_Rule } from "@/types/Orders";
+import { CWO_Rule } from "@/types/CWORule";
+import { validateCWORules } from "@/lib/validation/cwoRule";
 
 export interface ParseResult<T> {
   data: T[];
-  errors: Papa.ParseError[];
+  errors: { row: number; error: string }[];
   meta: Papa.ParseMeta;
 }
 
-export function parseCwoRule(
+export function parseCWORule(
   file: File
 ): Promise<ParseResult<Partial<CWO_Rule>>> {
   return new Promise((resolve, reject) => {
     Papa.parse<Partial<CWO_Rule>>(file, {
       header: true,
       skipEmptyLines: true,
-      transformHeader: (header) => {
-        const headerMap: Record<string, string> = {
-          "CWO Rule ID": "CWO_rule_id",
-          "CWO ID": "CWO_id",
-          "Number Format": "CWO_number_format",
-          "Final Invoice Label": "final_invoice_label",
-          "Extension Handling": "CWO_extension_handling",
-          "Mob/Demob Fee Rules": "mob_demob_fee_rules",
-        };
-
-        return headerMap[header] || header;
-      },
       complete: (results) => {
+        const processedData = results.data;
+        const validationErrors = validateCWORules(processedData);
         resolve({
-          data: results.data,
-          errors: results.errors,
+          data: processedData,
+          errors: validationErrors,
           meta: results.meta,
         });
       },
-      error: (error) => {
+      error(error: Error) {
         reject(error);
       },
     });

@@ -1,19 +1,18 @@
 import { prisma } from "@/lib/prisma";
+import { Project, ProjectView, APIProjectData } from "@/types/Project";
 
-export const createProject = async (data: {
-  project_name: string;
-  project_type: string;
-  project_id?: string;
-}) => {
-  return prisma.project.create({
-    data: {
-      ...data,
-      project_id: data.project_id || undefined,
+export const getAllProjects = async (): Promise<ProjectView[]> => {
+  return prisma.project.findMany({
+    include: {
+      contracts: true,
+      project_rules: true,
     },
   });
 };
 
-export const getProjectById = async (id: string) => {
+export const getProjectById = async (
+  id: string
+): Promise<ProjectView | null> => {
   return prisma.project.findUnique({
     where: { project_id: id },
     include: {
@@ -23,49 +22,34 @@ export const getProjectById = async (id: string) => {
   });
 };
 
-export const updateProject = async (id: string, data: any) => {
+export const deleteProject = async (id: string): Promise<Project> => {
+  return prisma.project.delete({
+    where: { project_id: id },
+  });
+};
+
+export const updateProject = async (
+  id: string,
+  data: Partial<Project>
+): Promise<Project> => {
   return prisma.project.update({
     where: { project_id: id },
     data,
   });
 };
 
-export const deleteProject = async (id: string) => {
-  return prisma.project.delete({
-    where: { project_id: id },
-  });
-};
+export const createProject = async (
+  data: APIProjectData | APIProjectData[]
+): Promise<Project[]> => {
+  const receivedData: APIProjectData[] = Array.isArray(data) ? data : [data];
 
-export const getAllProjects = async () => {
-  return prisma.project.findMany({
-    include: {
-      contracts: true,
-      project_rules: true,
-    },
-  });
-};
+  return Promise.all(
+    receivedData.map((project) => {
+      if (project.project_id === "") project.project_id = undefined;
 
-export const createProjects = async (
-  data: Array<{
-    project_name: string;
-    project_type: string;
-    project_id?: string;
-  }>
-) => {
-  return prisma.$transaction(async (prisma) => {
-    const projects = [];
-
-    for (const projectData of data) {
-      const project = await prisma.project.create({
-        data: {
-          ...projectData,
-          project_id: projectData.project_id || undefined,
-        },
+      return prisma.project.create({
+        data: project,
       });
-
-      projects.push(project);
-    }
-
-    return projects;
-  });
+    })
+  );
 };

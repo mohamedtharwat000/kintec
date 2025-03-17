@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import {
-  getAllRates,
-  createRate,
-  createBatchRates,
-} from "@/services/rates/rateService";
+import { Prisma } from "@prisma/client";
+import { getAllRates, createRate } from "@/services/rates/rateService";
+import { APIRateData } from "@/types/Rate";
 
 export async function GET() {
   try {
@@ -20,36 +18,17 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const requestData: APIRateData | APIRateData[] = await request.json();
+    const rates = await createRate(requestData);
 
-    // Check if it's a batch operation
-    if (Array.isArray(body)) {
-      const newRates = await createBatchRates(body);
-      return NextResponse.json(newRates, { status: 201 });
-    } else {
-      // Single rate creation
-      const newRate = await createRate(body);
-      return NextResponse.json(newRate, { status: 201 });
-    }
-  } catch (error: any) {
-    console.error(error);
-
-    if (
-      error.message === "Either PO_id or CWO_id must be provided, but not both"
-    ) {
+    return NextResponse.json(rates, { status: 201 });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
+    } else {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
-
-    if (error instanceof Error && "code" in error && error.code === "P2025") {
-      return NextResponse.json(
-        { error: "Invalid Reference ID" },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
   }
 }

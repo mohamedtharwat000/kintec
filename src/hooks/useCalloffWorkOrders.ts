@@ -1,13 +1,18 @@
 import axiosClient from "@/lib/axios";
 import { tryCatch } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CalloffWorkOrder } from "@/types/Orders";
+import {
+  CalloffWorkOrder,
+  CalloffWorkOrderView,
+  APICalloffWorkOrderData,
+} from "@/types/CalloffWorkOrder";
+import { parseCalloffWorkOrder } from "@/lib/csv/calloffWorkOrder";
 
 export function useCalloffWorkOrders() {
-  return useQuery<CalloffWorkOrder[]>({
+  return useQuery<CalloffWorkOrderView[]>({
     queryKey: ["calloffWorkOrders"],
     queryFn: async () => {
-      const { data } = await axiosClient.get<CalloffWorkOrder[]>(
+      const { data } = await axiosClient.get<CalloffWorkOrderView[]>(
         "/api/calloff_work_orders"
       );
       return data;
@@ -15,11 +20,11 @@ export function useCalloffWorkOrders() {
   });
 }
 
-export function useCalloffWorkOrder(id: string) {
-  return useQuery<CalloffWorkOrder>({
+export function useCalloffWorkOrder(id?: string) {
+  return useQuery<CalloffWorkOrderView>({
     queryKey: ["calloffWorkOrders", id],
     queryFn: async () => {
-      const { data } = await axiosClient.get<CalloffWorkOrder>(
+      const { data } = await axiosClient.get<CalloffWorkOrderView>(
         `/api/calloff_work_orders/${id}`
       );
       return data;
@@ -28,17 +33,14 @@ export function useCalloffWorkOrder(id: string) {
   });
 }
 
-export function useCreateCalloffWorkOrder() {
+export function useDeleteCalloffWorkOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (newCwo: Partial<CalloffWorkOrder>) => {
+    mutationFn: async (id: string) => {
       const result = await tryCatch(async () => {
-        const { data } = await axiosClient.post<CalloffWorkOrder>(
-          "/api/calloff_work_orders",
-          newCwo
-        );
-        return data;
+        await axiosClient.delete(`/api/calloff_work_orders/${id}`);
+        return true;
       });
 
       if (result.error) throw result.error;
@@ -83,22 +85,58 @@ export function useUpdateCalloffWorkOrder() {
   });
 }
 
-export function useDeleteCalloffWorkOrder() {
+export function useCreateCalloffWorkOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (
+      newCwos: APICalloffWorkOrderData | APICalloffWorkOrderData[]
+    ) => {
       const result = await tryCatch(async () => {
-        await axiosClient.delete(`/api/calloff_work_orders/${id}`);
-        return true;
+        const { data } = await axiosClient.post<CalloffWorkOrder[]>(
+          "/api/calloff_work_orders",
+          newCwos
+        );
+        return data;
       });
 
       if (result.error) throw result.error;
-      return result.data!;
+      return Array.isArray(newCwos) ? result.data! : result.data![0];
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["calloffWorkOrders"] });
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
     },
   });
+}
+
+export function useParseCalloffWorkOrderCsv() {
+  return async (file: File) => {
+    const { data, error } = await tryCatch(async () => {
+      const result = await parseCalloffWorkOrder(file);
+      return result;
+    });
+    if (error) return { error };
+    return { data };
+  };
+}
+
+export function useSearchFilter<T extends Record<string, any>>(
+  data: T[],
+  searchTerm: string,
+  searchFields: (keyof T)[]
+): T[] {
+  if (!searchTerm.trim()) return data;
+
+  const lowercaseSearchTerm = searchTerm.toLowerCase();
+
+  return data.filter((item) =>
+    searchFields.some((field) => {
+      const fieldValue = item[field];
+      return (
+        fieldValue &&
+        String(fieldValue).toLowerCase().includes(lowercaseSearchTerm)
+      );
+    })
+  );
 }

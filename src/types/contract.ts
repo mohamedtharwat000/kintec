@@ -1,29 +1,26 @@
-import { ClientCompany } from "@/types/ClientCompany";
-import { Contractor } from "@/types/Contractor";
-import { Project } from "@/types/Project";
-import { PurchaseOrder } from "@/types/Orders";
-import { CalloffWorkOrder } from "@/types/Orders";
+import {
+  contract,
+  contractor,
+  client_company,
+  project,
+  purchase_order,
+  calloff_work_order,
+} from "@prisma/client";
 
-export interface Contract {
-  contract_id: string;
-  contractor_id: string;
-  client_company_id: string;
-  project_id: string;
-  contract_start_date: Date;
-  contract_end_date: Date;
-  job_title: string;
-  job_type: string;
-  job_number: string;
-  kintec_cost_centre_code: string;
-  description_of_services?: string;
-  contract_status: ContractStatus;
-  PO_id?: string;
-  contractor?: Contractor;
-  client_company?: ClientCompany;
-  project?: Project;
-  purchase_order?: PurchaseOrder;
-  calloff_work_orders?: CalloffWorkOrder[];
-}
+export type Contract = contract;
+
+export type ContractView = Contract & {
+  contractor?: contractor;
+  client_company?: client_company;
+  project?: project;
+  purchase_order?: purchase_order;
+  calloff_work_orders?: calloff_work_order[];
+};
+
+export type MakePropertyOptional<T, K extends keyof T> = Omit<T, K> &
+  Partial<Pick<T, K>>;
+
+export type APIContractData = MakePropertyOptional<Contract, "contract_id">;
 
 export enum ContractStatus {
   active = "active",

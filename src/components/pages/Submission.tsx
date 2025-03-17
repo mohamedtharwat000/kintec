@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { SubmissionForm } from "@/components/forms/SubmissionForm";
-import { SubmissionDetails } from "@/components/detailsDialogs/SubmissionDetails";
+import { SubmissionDetails } from "@/components/000/SubmissionDetails";
 import { CSVPreviewDialog } from "@/components/csvPreviewDialog/Submission";
 import { parseSubmission } from "@/lib/csv/submission";
 import { format } from "date-fns";

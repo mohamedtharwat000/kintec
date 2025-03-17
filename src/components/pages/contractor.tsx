@@ -5,6 +5,8 @@ import {
   useContractors,
   useDeleteContractor,
   useCreateContractor,
+  useParseContractorCsv,
+  useSearchFilter,
 } from "@/hooks/useContractor";
 import { DataTable } from "@/components/dataTable/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
@@ -14,51 +16,63 @@ import { Input } from "@/components/ui/input";
 import { ContractorForm } from "@/components/forms/Contractor";
 import { toast } from "sonner";
 import type { Contractor as ContractorType } from "@/types/Contractor";
-import { parseContractor } from "@/lib/csv/contractor";
-import { validateContractors } from "@/lib/validation/contractor";
+import { CSVPreviewDialog } from "@/components/reusableModels/CSVPreviewDialog";
+import { DeleteConfirmationDialog } from "@/components/reusableModels/DeleteConfirmationDialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { ContractorDetails } from "@/components/detailsDialogs/Contractor";
-import { CSVPreviewDialog } from "@/components/csvPreviewDialog/Contractor";
+  DetailsDialog,
+  DetailSection,
+} from "@/components/reusableModels/DetailsDialog";
 import { tryCatch } from "@/lib/utils";
 
 export function Contractor() {
-  const { data: contractors = [], isLoading } = useContractors();
+  // Core data fetching hook
+  const { data: contractors = [], isLoading, refetch } = useContractors();
   const deleteContractor = useDeleteContractor();
   const createContractor = useCreateContractor();
+  const parseCSV = useParseContractorCsv();
 
+  // Page-level state management
   const [searchTerm, setSearchTerm] = useState("");
-  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedContractorId, setSelectedContractorId] = useState<
-    string | null
-  >(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [contractorToDelete, setContractorToDelete] = useState<string | null>(
-    null
-  );
-  const [isDeleting, setIsDeleting] = useState(false);
 
+  // Form dialog state
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [selectedContractorId, setSelectedContractorId] = useState<string>();
+
+  // Details dialog state
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [selectedContractorForDetails, setSelectedContractorForDetails] =
     useState<ContractorType | undefined>(undefined);
 
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [csvData, setCsvData] = useState<Partial<ContractorType>[]>([]);
-  const [csvFileName, setCsvFileName] = useState("");
-  const [validationErrors, setValidationErrors] = useState<
+  // CSV dialog state
+  const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvValidationErrors, setCsvValidationErrors] = useState<
     { row: number; error: string }[]
   >([]);
 
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [contractorToDelete, setContractorToDelete] = useState<string | null>(
+    null
+  );
+
+  // Filter data based on search term
+  const filteredData = useSearchFilter<ContractorType>(
+    contractors,
+    searchTerm,
+    [
+      "first_name",
+      "last_name",
+      "email_address",
+      "contractor_id",
+      "phone_number",
+    ]
+  );
+
+  // Simple handlers for UI actions
   const handleAddClick = () => {
-    setSelectedContractorId(null);
+    setSelectedContractorId(undefined);
     setIsFormDialogOpen(true);
   };
 
@@ -77,67 +91,114 @@ export function Contractor() {
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!contractorToDelete) return;
-
-    setIsDeleting(true);
-    const { error } = await tryCatch(() =>
-      deleteContractor.mutateAsync(contractorToDelete)
-    );
-
-    if (error) {
-      toast.error("Failed to delete contractor: " + error.message);
-    } else {
-      toast.success("Contractor deleted successfully");
-    }
-
-    setIsDeleting(false);
-    setDeleteDialogOpen(false);
-    setContractorToDelete(null);
-  };
-
-  const handleFileUpload = async (
+  const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      setUploadFile(file);
 
-    const { data, error } = await tryCatch(() => parseContractor(file));
+      const result = await parseCSV(file);
+      if (result.data) {
+        setCsvData(result.data.data);
+        setCsvValidationErrors(result.data.errors || []);
+        setIsCSVDialogOpen(true);
+      } else if (result.error) {
+        toast.error(`Failed to parse CSV: ${result.error.message}`);
+      }
 
-    if (error) {
-      toast.error("Failed to parse CSV file: " + error.message);
       event.target.value = "";
-      return;
     }
-
-    if (data) {
-      setCsvFileName(file.name);
-      setCsvData(data.data);
-      setValidationErrors(data.errors || []);
-      setIsPreviewOpen(true);
-    }
-
-    event.target.value = "";
   };
 
-  const handleConfirmCsvUpload = async () => {
-    if (validationErrors.length > 0) {
-      toast.error("Please fix validation errors before uploading");
-      return;
-    }
+  const handleCSVDialogClose = () => {
+    setIsCSVDialogOpen(false);
+    setCsvData([]);
+    setCsvValidationErrors([]);
+    setUploadFile(null);
+  };
 
-    const { error } = await tryCatch(() =>
-      createContractor.mutateAsync(csvData)
-    );
+  const handleCsvUpload = async () => {
+    if (!csvData.length) return;
 
-    if (error) {
-      toast.error("Failed to import contractors from CSV: " + error.message);
-    } else {
+    try {
+      await createContractor.mutateAsync(csvData);
       toast.success(`Successfully imported ${csvData.length} contractors`);
-      setIsPreviewOpen(false);
+      refetch();
+      setIsCSVDialogOpen(false);
       setCsvData([]);
-      setCsvFileName("");
+      setCsvValidationErrors([]);
+      setUploadFile(null);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to import contractors: ${errorMessage}`);
     }
+  };
+
+  const handleFormSuccess = () => {
+    refetch();
+    setIsFormDialogOpen(false);
+  };
+
+  // Format date for display
+  const formatDate = (date: Date | string | undefined) => {
+    if (!date) return "N/A";
+    return new Date(date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  // Generate detail sections for the contractor
+  const getContractorDetailSections = (): DetailSection[] => {
+    if (!selectedContractorForDetails) return [];
+
+    return [
+      {
+        title: "Personal Information",
+        items: [
+          { label: "ID", value: selectedContractorForDetails.contractor_id },
+          {
+            label: "Full Name",
+            value: `${selectedContractorForDetails.first_name} ${selectedContractorForDetails.middle_name ? selectedContractorForDetails.middle_name + " " : ""}${selectedContractorForDetails.last_name}`,
+          },
+          {
+            label: "Date of Birth",
+            value: formatDate(selectedContractorForDetails.date_of_birth),
+          },
+          {
+            label: "Email Address",
+            value: (
+              <a
+                href={`mailto:${selectedContractorForDetails.email_address}`}
+                className="text-blue-600 hover:underline"
+              >
+                {selectedContractorForDetails.email_address}
+              </a>
+            ),
+          },
+          {
+            label: "Phone Number",
+            value: selectedContractorForDetails.phone_number,
+          },
+          {
+            label: "Nationality",
+            value: selectedContractorForDetails.nationality,
+          },
+          {
+            label: "Country of Residence",
+            value: selectedContractorForDetails.country_of_residence,
+          },
+          {
+            label: "Address",
+            value: selectedContractorForDetails.address,
+            colSpan: 2,
+          },
+        ],
+      },
+    ];
   };
 
   const columns: ColumnDef<ContractorType>[] = [
@@ -205,19 +266,6 @@ export function Contractor() {
     },
   ];
 
-  const filteredData = contractors.filter(
-    (contractor) =>
-      contractor.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contractor.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contractor.email_address
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      contractor.contractor_id
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      contractor.phone_number.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   return (
     <div className="flex flex-col gap-4 p-4">
       <h1 className="text-xl sm:text-2xl font-semibold">
@@ -245,7 +293,7 @@ export function Contractor() {
           <input
             type="file"
             accept=".csv"
-            onChange={handleFileUpload}
+            onChange={handleFileChange}
             className="hidden"
             id="csv-upload"
           />
@@ -272,68 +320,49 @@ export function Contractor() {
 
       {/* Add/Edit Form Dialog */}
       <ContractorForm
-        contractorId={selectedContractorId || undefined}
+        contractorId={selectedContractorId}
         open={isFormDialogOpen}
         onClose={() => {
           setIsFormDialogOpen(false);
         }}
+        onSuccess={handleFormSuccess}
       />
 
-      {/* Details Dialog */}
-      <ContractorDetails
-        contractor={selectedContractorForDetails}
-        open={isDetailsDialogOpen}
-        onClose={() => setIsDetailsDialogOpen(false)}
-      />
+      {/* Details Dialog - Using the reusable component */}
+      {selectedContractorForDetails && (
+        <DetailsDialog
+          title={`${selectedContractorForDetails.first_name} ${selectedContractorForDetails.last_name}`}
+          open={isDetailsDialogOpen}
+          onClose={() => setIsDetailsDialogOpen(false)}
+          sections={getContractorDetailSections()}
+        />
+      )}
 
       {/* CSV Preview Dialog */}
-      <CSVPreviewDialog
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        data={csvData}
-        fileName={csvFileName}
-        onConfirm={handleConfirmCsvUpload}
-        validationErrors={validationErrors}
-      />
+      {uploadFile && (
+        <CSVPreviewDialog
+          isOpen={isCSVDialogOpen}
+          onClose={handleCSVDialogClose}
+          data={csvData}
+          fileName={uploadFile.name}
+          onConfirm={handleCsvUpload}
+          validationErrors={csvValidationErrors}
+          title="Import Contractors"
+          description="Review contractor data before import"
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog
+      <DeleteConfirmationDialog
         open={deleteDialogOpen}
-        onOpenChange={(open) => {
-          if (!isDeleting && !open) {
-            setDeleteDialogOpen(false);
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              contractor and remove all related data.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-            <AlertDialogCancel className="mt-2 sm:mt-0" disabled={isDeleting}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
-                  Deleting...
-                </>
-              ) : (
-                "Delete"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onClose={() => setDeleteDialogOpen(false)}
+        onDelete={deleteContractor.mutateAsync}
+        itemId={contractorToDelete}
+        title="Delete Contractor"
+        description="Are you sure you want to delete this contractor? This action cannot be undone and will remove all related data."
+        successMessage="Contractor deleted successfully"
+        errorMessage="Failed to delete contractor"
+      />
     </div>
   );
 }

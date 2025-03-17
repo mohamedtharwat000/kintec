@@ -1,55 +1,54 @@
 import { prisma } from "@/lib/prisma";
-import { common_rejection_type } from "@prisma/client";
+import {
+  CommonRejection,
+  APICommonRejectionData,
+} from "@/types/CommonRejection";
 
-export const createCommonRejection = async (data: {
-  common_rejection_type: common_rejection_type;
-  resolution_process: string;
-}) => {
-  return prisma.common_rejection.create({
-    data,
-  });
+export const getAllCommonRejections = async (): Promise<CommonRejection[]> => {
+  return prisma.common_rejection.findMany();
 };
 
-export const getCommonRejectionById = async (id: string) => {
+export const getCommonRejectionById = async (
+  id: string
+): Promise<CommonRejection | null> => {
   return prisma.common_rejection.findUnique({
     where: { common_rejection_id: id },
   });
 };
 
-export const updateCommonRejection = async (id: string, data: any) => {
+export const deleteCommonRejection = async (
+  id: string
+): Promise<CommonRejection> => {
+  return prisma.common_rejection.delete({
+    where: { common_rejection_id: id },
+  });
+};
+
+export const updateCommonRejection = async (
+  id: string,
+  data: Partial<CommonRejection>
+): Promise<CommonRejection> => {
   return prisma.common_rejection.update({
     where: { common_rejection_id: id },
     data,
   });
 };
 
-export const deleteCommonRejection = async (id: string) => {
-  return prisma.common_rejection.delete({
-    where: { common_rejection_id: id },
-  });
-};
+export const createCommonRejection = async (
+  data: APICommonRejectionData | APICommonRejectionData[]
+): Promise<CommonRejection[]> => {
+  const receivedData: APICommonRejectionData[] = Array.isArray(data)
+    ? data
+    : [data];
 
-export const getAllCommonRejections = async () => {
-  return prisma.common_rejection.findMany();
-};
+  return Promise.all(
+    receivedData.map((rejection) => {
+      if (rejection.common_rejection_id === "")
+        rejection.common_rejection_id = undefined;
 
-export const createCommonRejections = async (
-  data: Array<{
-    common_rejection_type: common_rejection_type;
-    resolution_process: string;
-  }>
-) => {
-  return prisma.$transaction(async (prisma) => {
-    const commonRejections = [];
-
-    for (const rejectionData of data) {
-      const commonRejection = await prisma.common_rejection.create({
-        data: rejectionData,
+      return prisma.common_rejection.create({
+        data: rejection,
       });
-
-      commonRejections.push(commonRejection);
-    }
-
-    return commonRejections;
-  });
+    })
+  );
 };

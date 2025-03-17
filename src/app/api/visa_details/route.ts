@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import {
   getAllVisaDetails,
-  createVisaDetails,
+  createVisaDetail,
 } from "@/services/visa_details/visaDetailService";
+import { APIVisaDetailData } from "@/types/VisaDetail";
 
 export async function GET() {
   try {
@@ -19,20 +21,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const visaDetailsData = Array.isArray(body) ? body : [body];
+    const requestData: APIVisaDetailData | APIVisaDetailData[] =
+      await request.json();
+    const visaDetails = await createVisaDetail(requestData);
 
-    const newVisaDetails = await createVisaDetails(visaDetailsData);
-
-    return NextResponse.json(newVisaDetails, { status: 201 });
-  } catch (error: any) {
-    if (error instanceof Error && "code" in error && error.code === "P2002") {
-      return NextResponse.json({ error: "Invalid Request" }, { status: 400 });
+    return NextResponse.json(visaDetails, { status: 201 });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    } else {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
-
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
   }
 }
