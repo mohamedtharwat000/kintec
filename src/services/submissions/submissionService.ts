@@ -53,9 +53,23 @@ export const createSubmission = async (
 ): Promise<Submission[]> => {
   const receivedData: APISubmissionData[] = Array.isArray(data) ? data : [data];
 
+  receivedData.forEach((submission) => {
+    if (
+      (!submission.PO_id && !submission.CWO_id) ||
+      (submission.PO_id && submission.CWO_id)
+    ) {
+      throw new Error("Exactly one of PO_id or CWO_id must be provided.");
+    }
+  });
+
   return Promise.all(
     receivedData.map((submission) => {
       if (submission.submission_id === "") submission.submission_id = undefined;
+      if (submission.CWO_id === "") submission.CWO_id = null;
+      if (submission.PO_id === "") submission.PO_id = null;
+      if (!submission.wht_applicable) submission.wht_applicable = null;
+      if (!submission.external_assignment)
+        submission.external_assignment = null;
 
       return prisma.submission.create({
         data: submission,

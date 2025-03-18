@@ -15,6 +15,11 @@ export function parseReview(file: File): Promise<ParseResult<Partial<Review>>> {
       skipEmptyLines: true,
       complete: (results) => {
         const processedData = results.data;
+        processedData.forEach((row) => {
+          if (row.special_review_required)
+            row.special_review_required =
+              row.special_review_required.toString() === "true";
+        });
         const validationErrors = validateReview(processedData);
         resolve({
           data: processedData,

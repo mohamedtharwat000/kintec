@@ -7,7 +7,7 @@ export const expenseSchema = z.object({
   expense_type: z.nativeEnum(ExpenseType),
   expense_frequency: z.nativeEnum(ExpenseFrequency),
   expense_value: z.number().or(z.string().transform(Number)),
-  expense_currency: z.string().min(1, "Currency is required"),
+  expsense_currency: z.string().min(1, "Currency is required"),
   pro_rata_percentage: z.number().or(z.string().transform(Number)).optional(),
 });
 

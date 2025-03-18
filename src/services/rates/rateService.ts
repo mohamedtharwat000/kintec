@@ -71,9 +71,17 @@ export const createRate = async (
 ): Promise<Rate[]> => {
   const receivedData: APIRateData[] = Array.isArray(data) ? data : [data];
 
+  receivedData.forEach((rate) => {
+    if ((!rate.PO_id && !rate.CWO_id) || (rate.PO_id && rate.CWO_id)) {
+      throw new Error("Exactly one of PO_id or CWO_id must be provided.");
+    }
+  });
+
   return Promise.all(
-    receivedData.map((rate) => {
+    receivedData.map(async (rate) => {
       if (rate.rate_id === "") rate.rate_id = undefined;
+      if (rate.PO_id === "") rate.PO_id = null;
+      if (rate.CWO_id === "") rate.CWO_id = null;
 
       return prisma.rate.create({
         data: rate,

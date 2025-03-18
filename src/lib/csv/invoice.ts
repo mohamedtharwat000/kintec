@@ -17,6 +17,15 @@ export function parseInvoice(
       skipEmptyLines: true,
       complete: (results) => {
         const processedData = results.data;
+        processedData.forEach((row) => {
+          if (row.wht_applicable)
+            row.wht_applicable = row.wht_applicable.toString() === "true";
+          if (row.external_assignment)
+            row.external_assignment =
+              row.external_assignment.toString() === "true";
+
+          if (row.wht_rate) row.wht_rate = parseFloat(row.wht_rate.toString());
+        });
         const validationErrors = validateInvoice(processedData);
         resolve({
           data: processedData,

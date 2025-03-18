@@ -20,6 +20,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const requestData: APIRateData | APIRateData[] = await request.json();
+
     const rates = await createRate(requestData);
 
     return NextResponse.json(rates, { status: 201 });

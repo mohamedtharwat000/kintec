@@ -1,0 +1,3 @@
+submission_id,contractor_id,PO_id,CWO_id,billing_period,payment_currency,invoice_currency,invoice_due_date,wht_rate,wht_applicable,external_assignment
+SUB-001,CT-L001,PO-002,,2024-01-01T00:00:00.000Z,USD,USD,2024-01-31T00:00:00.000Z,0.1,true,false
+,CT-L001,,CWO-001,2024-02-01T00:00:00.000Z,EUR,EUR,2024-02-28T00:00:00.000Z,0.15,true,true

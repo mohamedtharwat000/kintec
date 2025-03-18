@@ -1,0 +1,3 @@
+PO_id,PO_start_date,PO_end_date,contract_id,PO_total_value,PO_status,kintec_email_for_remittance
+PO-002,2024-01-01T00:00:00.000Z,2024-12-31T00:00:00.000Z,111,100000.00,active,remittance@kintec.com
+,2024-02-01T00:00:00.000Z,2025-01-31T00:00:00.000Z,8ead1796-e65a-4e3b-a1f8-d91a88e3aa2a,120000.00,active,remittance2@kintec.com

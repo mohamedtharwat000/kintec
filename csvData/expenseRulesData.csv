@@ -1,0 +1,3 @@
+exp_val_rule_id,expense_id,allowable_expense_types,expense_documentation,supporting_documentation_type,expense_limit,reimbursement_rule
+EXPR-001,EXP-001,travel,receipt,image,100,0.1
+,EXP-001,food,invoice,pdf,50,0.2

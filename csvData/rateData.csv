@@ -1,0 +1,3 @@
+rate_id,PO_id,CWO_id,rate_type,rate_frequency,rate_value,rate_currency
+RT-001,,CWO-001,charged,monthly,5000.00,USD
+,PO-002,,paid,daily,250.00,EUR

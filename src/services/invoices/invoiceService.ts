@@ -49,6 +49,9 @@ export const createInvoice = async (
   return Promise.all(
     receivedData.map((invoice) => {
       if (invoice.invoice_id === "") invoice.invoice_id = undefined;
+      if (invoice.PO_id === "") invoice.PO_id = null;
+      if (invoice.CWO_id === "") invoice.CWO_id = null;
+      if (!invoice.wht_rate) invoice.wht_rate = null;
 
       return prisma.invoice.create({
         data: invoice,

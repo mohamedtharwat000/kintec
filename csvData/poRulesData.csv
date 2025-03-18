@@ -1,0 +1,3 @@
+RPO_rule_id,PO_id,RPO_number_format,final_invoice_label,RPO_extension_handling,mob_demob_fee_rules
+RPO-001,PO-002,RPO-###,Final Invoice,Allowed,Standard
+,PO-002,RPO-###,Final Invoice,Not Allowed,Special

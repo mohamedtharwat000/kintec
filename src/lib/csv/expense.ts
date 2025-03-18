@@ -17,6 +17,14 @@ export function parseExpense(
       skipEmptyLines: true,
       complete: (results) => {
         const processedData = results.data;
+        processedData.forEach((row) => {
+          if (row.pro_rata_percentage) {
+            row.pro_rata_percentage = parseFloat(
+              row.pro_rata_percentage.toString()
+            );
+          }
+        });
+
         const validationErrors = validateExpense(processedData);
         resolve({
           data: processedData,

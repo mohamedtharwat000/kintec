@@ -17,6 +17,13 @@ export function parseBankDetail(
       skipEmptyLines: true,
       complete: (results) => {
         const processedData = results.data;
+        processedData.forEach((row) => {
+          if (row.bank_detail_validated) {
+            row.bank_detail_validated =
+              row.bank_detail_validated.toString().toLowerCase() === "true";
+          }
+        });
+
         const validationErrors = validateBankDetails(processedData);
         resolve({
           data: processedData,

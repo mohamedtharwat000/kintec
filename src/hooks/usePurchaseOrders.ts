@@ -13,7 +13,7 @@ export function usePurchaseOrders() {
     queryKey: ["purchaseOrders"],
     queryFn: async () => {
       const { data } = await axiosClient.get<PurchaseOrderView[]>(
-        "/api/purchase-orders"
+        "/api/purchase_orders"
       );
       return data;
     },
@@ -39,7 +39,7 @@ export function useDeletePurchaseOrder() {
   return useMutation({
     mutationFn: async (id: string) => {
       const result = await tryCatch(async () => {
-        await axiosClient.delete(`/api/purchase-orders/${id}`);
+        await axiosClient.delete(`/api/purchase_orders/${id}`);
         return true;
       });
 
@@ -67,7 +67,7 @@ export function useUpdatePurchaseOrder() {
       const result = await tryCatch(async () => {
         const { data: updatedPurchaseOrder } =
           await axiosClient.put<PurchaseOrder>(
-            `/api/purchase-orders/${id}`,
+            `/api/purchase_orders/${id}`,
             data
           );
         return updatedPurchaseOrder;
@@ -95,7 +95,7 @@ export function useCreatePurchaseOrder() {
     ) => {
       const result = await tryCatch(async () => {
         const { data } = await axiosClient.post<PurchaseOrder[]>(
-          "/api/purchase-orders",
+          "/api/purchase_orders",
           newPurchaseOrders
         );
         return data;
