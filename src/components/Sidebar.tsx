@@ -20,6 +20,7 @@ import {
   DollarSign,
   ClipboardEdit,
   ArrowDownUp,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -720,6 +721,25 @@ export function AppSidebar({ currentView, onNavigation }: SidebarProps) {
                   <div className="flex items-center">
                     <ArrowDownUp className="h-4 w-4 mr-2" />
                     <span>Rates</span>
+                  </div>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              {/* Common Rejections - Add as a standalone menu item */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={currentView === "commonRejections"}
+                  onClick={() => onNavigation("commonRejections")}
+                  className={cn(
+                    "cursor-pointer transition-all relative",
+                    "hover:bg-accent",
+                    currentView === "commonRejections" && ["!bg-gray-500"]
+                  )}
+                >
+                  <div className="flex items-center">
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    <span>Common Rejections</span>
                   </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>

@@ -21,6 +21,7 @@ import { Rate } from "@/components/pages/Rate";
 import { Submission } from "@/components/pages/Submission";
 import { SubmissionValidationRule } from "@/components/pages/SubmissionValidationRule";
 import { Review } from "@/components/pages/Review";
+import { CommonRejection } from "@/components/pages/CommonRejection";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/header/site-header";
 import { useAppStore } from "@/store/useAppStore";
@@ -98,6 +99,8 @@ export function App({ dashboard }: AppProps) {
         return <SubmissionValidationRule />;
       case "reviews":
         return <Review />;
+      case "commonRejections":
+        return <CommonRejection />;
     }
   };
 
