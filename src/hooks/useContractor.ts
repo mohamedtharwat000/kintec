@@ -3,7 +3,7 @@ import {
   Contractor,
   ContractorView,
   APIContractorData,
-} from "@/types/ContractorType";
+} from "@/types/Contractor";
 import axiosClient from "@/lib/axios";
 import { tryCatch } from "@/lib/utils";
 import { parseContractor } from "@/lib/csv/contractor";

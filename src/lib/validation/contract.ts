@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Contract, ContractStatus } from "@/types/ContractType";
+import { Contract, ContractStatus } from "@/types/Contract";
 
 export const contractSchema = z.object({
   job_title: z.string().min(1, "Job title is required"),

@@ -37,7 +37,7 @@ import {
 import { useClients } from "@/hooks/useClientCompany";
 import { useContractors } from "@/hooks/useContractor";
 import { useProjects } from "@/hooks/useProjects";
-import { ContractStatus } from "@/types/ContractType";
+import { ContractStatus } from "@/types/Contract";
 import {
   Form,
   FormControl,

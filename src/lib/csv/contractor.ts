@@ -1,5 +1,5 @@
 import Papa from "papaparse";
-import { Contractor } from "@/types/ContractorType";
+import { Contractor } from "@/types/Contractor";
 import { validateContractors } from "@/lib/validation/contractor";
 
 export interface ParseResult<T> {

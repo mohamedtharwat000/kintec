@@ -15,7 +15,7 @@ import { Plus, Search, Pencil, Trash2, Upload, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ContractForm } from "@/components/forms/Contract";
 import { Badge } from "@/components/ui/badge";
-import type { ContractView } from "@/types/ContractType";
+import type { ContractView } from "@/types/Contract";
 import { toast } from "sonner";
 import { CSVPreviewDialog } from "@/components/reusableModels/CSVPreviewDialog";
 import { DeleteConfirmationDialog } from "@/components/reusableModels/DeleteConfirmationDialog";

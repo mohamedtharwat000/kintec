@@ -4,7 +4,7 @@ import {
   getAllContractors,
   createContractor,
 } from "@/services/contractors/contractorService";
-import { APIContractorData } from "@/types/ContractorType";
+import { APIContractorData } from "@/types/Contractor";
 
 export async function GET() {
   try {
