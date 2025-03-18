@@ -12,7 +12,6 @@ COPY package*.json pnpm-lock.yaml ./
 
 # Install dependencies using pnpm
 RUN pnpm install
-RUN pnpm dlx prisma generate
 
 # Copy the rest of your project files (including configuration files)
 COPY . .
