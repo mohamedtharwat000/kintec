@@ -2,11 +2,11 @@ version: "3.8"
 services:
   app:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
     restart: always
     image: kintec
-    container_name: -1
+    container_name: temp
     env_file:
       - .env
     ports:
