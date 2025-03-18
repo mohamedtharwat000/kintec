@@ -47,6 +47,7 @@ export function useDeleteInvoiceFormattingRule() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoiceFormattingRules"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
   });
 }
@@ -79,6 +80,7 @@ export function useUpdateInvoiceFormattingRule() {
       queryClient.invalidateQueries({
         queryKey: ["invoiceFormattingRules", variables.id],
       });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
   });
 }
@@ -103,8 +105,20 @@ export function useCreateInvoiceFormattingRule() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["invoiceFormattingRules"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
     },
   });
+}
+
+export function useParseInvoiceFormattingRuleCsv() {
+  return async (file: File) => {
+    const { data, error } = await tryCatch(async () => {
+      const result = await parseInvoiceFormattingRule(file);
+      return result;
+    });
+    if (error) return { error };
+    return { data };
+  };
 }
 
 export function useSearchFilter<T extends Record<string, any>>(
@@ -125,15 +139,4 @@ export function useSearchFilter<T extends Record<string, any>>(
       );
     })
   );
-}
-
-export function useParseInvoiceFormattingRuleCsv() {
-  return async (file: File) => {
-    const { data, error } = await tryCatch(async () => {
-      const result = await parseInvoiceFormattingRule(file);
-      return result;
-    });
-    if (error) return { error };
-    return { data };
-  };
 }

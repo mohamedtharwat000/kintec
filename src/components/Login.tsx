@@ -1,7 +1,6 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAppStore } from "@/store/useAppStore";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,6 @@ import {
 
 export default function AppLogin() {
   const { setAuthenticated, setUsername } = useAppStore();
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -33,7 +31,6 @@ export default function AppLogin() {
         setAuthenticated(true, username);
         setUsername(username);
         toast.success("Successfully logged in");
-        router.refresh();
       } else {
         toast.error(res?.error || "Invalid credentials");
       }

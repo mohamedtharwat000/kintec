@@ -7,22 +7,13 @@ import {
 } from "@prisma/client";
 
 export async function getDashboardStats() {
+  // Summary statistics
   const clientsCount = await prisma.client_company.count();
   const contractorsCount = await prisma.contractor.count();
   const projectsCount = await prisma.project.count();
   const contractsCount = await prisma.contract.count();
 
-  const invoicesCount = await prisma.invoice.count();
-  const pendingInvoicesCount = await prisma.invoice.count({
-    where: { invoice_status: invoice_status.pending },
-  });
-  const paidInvoicesCount = await prisma.invoice.count({
-    where: { invoice_status: invoice_status.paid },
-  });
-  const totalInvoiceValue = await prisma.invoice.aggregate({
-    _sum: { invoice_total_value: true },
-  });
-
+  // Contract statistics
   const activeContractsCount = await prisma.contract.count({
     where: { contract_status: contract_status.active },
   });
@@ -33,16 +24,29 @@ export async function getDashboardStats() {
     where: { contract_status: contract_status.terminated },
   });
 
+  // Purchase order statistics
   const activePOsCount = await prisma.purchase_order.count({
     where: { PO_status: PO_status.active },
   });
   const expiredPOsCount = await prisma.purchase_order.count({
     where: { PO_status: PO_status.expired },
   });
+  const cancelledPOsCount = await prisma.purchase_order.count({
+    where: { PO_status: PO_status.cancelled },
+  });
 
-  const submissionsCount = await prisma.submission.count();
-  const reviewsCount = await prisma.review.count();
+  // Call-off work order statistics
+  const activeCWOsCount = await prisma.calloff_work_order.count({
+    where: { CWO_status: PO_status.active },
+  });
+  const expiredCWOsCount = await prisma.calloff_work_order.count({
+    where: { CWO_status: PO_status.expired },
+  });
+  const cancelledCWOsCount = await prisma.calloff_work_order.count({
+    where: { CWO_status: PO_status.cancelled },
+  });
 
+  // Alerts for expiring items and pending invoices
   const thirtyDaysFromNow = new Date();
   thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
@@ -66,6 +70,10 @@ export async function getDashboardStats() {
     },
   });
 
+  const pendingInvoicesCount = await prisma.invoice.count({
+    where: { invoice_status: invoice_status.pending },
+  });
+
   return {
     summary: {
       clientsCount,
@@ -73,24 +81,21 @@ export async function getDashboardStats() {
       projectsCount,
       contractsCount,
     },
-    financial: {
-      invoicesCount,
-      pendingInvoicesCount,
-      paidInvoicesCount,
-      totalInvoiceValue: totalInvoiceValue._sum.invoice_total_value || 0,
-    },
     operations: {
       activeContractsCount,
       expiredContractsCount,
       terminatedContractsCount,
       activePOsCount,
       expiredPOsCount,
-      submissionsCount,
-      reviewsCount,
+      cancelledPOsCount,
+      activeCWOsCount,
+      expiredCWOsCount,
+      cancelledCWOsCount,
     },
     alerts: {
       expiringVisasCount,
       expiringContractsCount,
+      pendingInvoicesCount,
     },
   };
 }

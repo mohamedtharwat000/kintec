@@ -5,55 +5,70 @@ import {
   useReviews,
   useDeleteReview,
   useCreateReview,
+  useSearchFilter,
+  useParseReviewCsv,
 } from "@/hooks/useReviews";
 import { DataTable } from "@/components/dataTable/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Plus, Search, Pencil, Trash2, Upload, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
-import { Review as ReviewType, ReviewStatus } from "@/types/Review";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { ReviewForm } from "@/components/forms/ReviewForm";
-import { ReviewDetails } from "@/components/000/ReviewDetails";
-import { CSVPreviewDialog } from "@/components/csvPreviewDialog/Review";
-import { parseReview } from "@/lib/csv/review";
-import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { Review as ReviewType, ReviewStatus } from "@/types/Review";
+import { toast } from "sonner";
+import { CSVPreviewDialog } from "@/components/reusableModels/CSVPreviewDialog";
+import { DeleteConfirmationDialog } from "@/components/reusableModels/DeleteConfirmationDialog";
+import {
+  DetailsDialog,
+  DetailSection,
+} from "@/components/reusableModels/DetailsDialog";
+import { format } from "date-fns";
 
 export function Review() {
-  const { data: reviews = [], isLoading } = useReviews();
+  // Core data fetching hook
+  const { data: reviews = [], isLoading, refetch } = useReviews();
   const deleteReview = useDeleteReview();
   const createReview = useCreateReview();
+  const parseCSV = useParseReviewCsv();
 
+  // Page-level state management
   const [searchTerm, setSearchTerm] = useState("");
-  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
-  const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
-  const [selectedReview, setSelectedReview] = useState<ReviewType | null>(null);
 
-  // CSV upload state
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  // Form dialog state
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [selectedReviewId, setSelectedReviewId] = useState<string | undefined>(
+    undefined
+  );
+
+  // Details dialog state
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [selectedReviewForDetails, setSelectedReviewForDetails] = useState<
+    ReviewType | undefined
+  >(undefined);
+
+  // CSV dialog state
+  const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<any[]>([]);
-  const [csvDataToUpload, setCsvDataToUpload] = useState<any[]>([]);
-  const [csvFileName, setCsvFileName] = useState("");
-  const [validationErrors, setValidationErrors] = useState<
+  const [csvValidationErrors, setCsvValidationErrors] = useState<
     { row: number; error: string }[]
   >([]);
 
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
+
+  // Filter data based on search term
+  const filteredData = useSearchFilter<ReviewType>(reviews, searchTerm, [
+    "submission_id",
+    "reviewer_name",
+    "review_status",
+  ]);
+
+  // Simple handlers for UI actions
   const handleAddClick = () => {
-    setSelectedReviewId(null);
+    setSelectedReviewId(undefined);
     setIsFormDialogOpen(true);
   };
 
@@ -62,9 +77,9 @@ export function Review() {
     setIsFormDialogOpen(true);
   };
 
-  const handleViewDetails = (review: ReviewType) => {
-    setSelectedReview(review);
-    setViewDetailsOpen(true);
+  const handleDetailsClick = (review: ReviewType) => {
+    setSelectedReviewForDetails(review);
+    setIsDetailsDialogOpen(true);
   };
 
   const handleDeleteClick = (reviewId: string) => {
@@ -72,200 +87,278 @@ export function Review() {
     setDeleteDialogOpen(true);
   };
 
-  const handleFormClose = () => {
-    setIsFormDialogOpen(false);
-  };
-
-  const handleFormSuccess = () => {
-    // The form itself will handle success actions
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!reviewToDelete) return;
-
-    try {
-      await deleteReview.mutateAsync(reviewToDelete);
-      toast.success("Review deleted successfully");
-    } catch (error) {
-      toast.error("Failed to delete review");
-    } finally {
-      setDeleteDialogOpen(false);
-      setReviewToDelete(null);
-    }
-  };
-
-  const handleFileUpload = async (
+  const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      setUploadFile(file);
 
-    try {
-      // Parse CSV file using the dedicated parser
-      const result = await parseReview(file);
+      const result = await parseCSV(file);
+      if (result.data) {
+        setCsvData(result.data.data);
+        setCsvValidationErrors(result.data.errors);
+        setIsCSVDialogOpen(true);
+      } else if (result.error) {
+        toast.error(`Failed to parse CSV: ${result.error.message}`);
+      }
 
-      setCsvFileName(file.name);
-      setCsvData(result.data);
-      setCsvDataToUpload(result.dataToUpload);
-      setValidationErrors(result.errors);
-
-      // Show preview dialog
-      setIsPreviewOpen(true);
-    } catch (error) {
-      console.error("Error parsing CSV:", error);
-      toast.error("Failed to parse CSV file");
-    } finally {
-      // Reset the file input
       event.target.value = "";
     }
   };
 
-  // Handle CSV data import confirmation
-  const handleConfirmCsvUpload = async () => {
-    try {
-      // Submit all CSV data as an array to the API
-      await Promise.all(
-        csvDataToUpload.map((review) => createReview.mutateAsync(review))
-      );
+  const handleCSVDialogClose = () => {
+    setIsCSVDialogOpen(false);
+    setCsvData([]);
+    setCsvValidationErrors([]);
+    setUploadFile(null);
+  };
 
-      toast.success(`Successfully imported ${csvDataToUpload.length} reviews`);
+  const handleCsvUpload = async () => {
+    if (!csvData.length) return;
+
+    try {
+      await createReview.mutateAsync(csvData);
+      toast.success(`Successfully imported ${csvData.length} reviews`);
+      refetch();
+      setIsCSVDialogOpen(false);
       setCsvData([]);
-      setCsvDataToUpload([]);
-      setCsvFileName("");
-      return Promise.resolve();
+      setCsvValidationErrors([]);
+      setUploadFile(null);
     } catch (error) {
-      console.error("Error importing CSV data:", error);
-      toast.error("Failed to import reviews from CSV");
-      return Promise.reject(error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to import reviews: ${errorMessage}`);
     }
   };
 
+  const handleFormSuccess = () => {
+    refetch();
+    setIsFormDialogOpen(false);
+  };
+
+  const formatDate = (date: Date) => {
+    return format(new Date(date), "PP");
+  };
+
+  // Get status badge with appropriate styling
   const getStatusBadge = (status: ReviewStatus) => {
-    switch (status) {
-      case ReviewStatus.approved:
-        return <Badge className="bg-green-500">Approved</Badge>;
-      case ReviewStatus.rejected:
-        return <Badge className="bg-red-500">Rejected</Badge>;
-      case ReviewStatus.pending:
-      default:
-        return <Badge className="bg-yellow-500">Pending</Badge>;
-    }
+    const colorMap: Record<ReviewStatus, string> = {
+      pending: "bg-yellow-500 hover:bg-yellow-600",
+      approved: "bg-green-500 hover:bg-green-600",
+      rejected: "bg-red-500 hover:bg-red-600",
+    };
+
+    return (
+      <Badge className={colorMap[status] || "bg-gray-500"}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    );
+  };
+
+  // Generate detail sections for the review
+  const getReviewDetailSections = (): DetailSection[] => {
+    if (!selectedReviewForDetails) return [];
+
+    return [
+      {
+        title: "Review Information",
+        items: [
+          { label: "Review ID", value: selectedReviewForDetails.review_id },
+          {
+            label: "Submission ID",
+            value: selectedReviewForDetails.submission_id,
+          },
+          {
+            label: "Reviewer Name",
+            value: selectedReviewForDetails.reviewer_name,
+          },
+          {
+            label: "Status",
+            value: getStatusBadge(
+              selectedReviewForDetails.review_status as ReviewStatus
+            ),
+          },
+          {
+            label: "Review Date",
+            value: formatDate(
+              new Date(selectedReviewForDetails.review_timestamp)
+            ),
+          },
+          {
+            label: "Special Review Required",
+            value: selectedReviewForDetails.special_review_required
+              ? "Yes"
+              : "No",
+          },
+        ],
+      },
+      {
+        title: "Validation Details",
+        items: [
+          {
+            label: "Overall Validation Status",
+            value: (
+              <Badge
+                className={
+                  selectedReviewForDetails.overall_validation_status ===
+                  "approved"
+                    ? "bg-green-500"
+                    : "bg-red-500"
+                }
+              >
+                {selectedReviewForDetails.overall_validation_status}
+              </Badge>
+            ),
+          },
+          {
+            label: "Last Validation Date",
+            value: formatDate(
+              new Date(selectedReviewForDetails.last_overall_validation_date)
+            ),
+          },
+          {
+            label: "Updated By",
+            value: selectedReviewForDetails.updated_by,
+          },
+        ],
+      },
+      ...(selectedReviewForDetails.review_rejection_reason
+        ? [
+            {
+              title: "Rejection Details",
+              items: [
+                {
+                  label: "Rejection Reason",
+                  value:
+                    selectedReviewForDetails.review_rejection_reason as string,
+                  colSpan: 2 as const,
+                },
+              ],
+            },
+          ]
+        : []),
+      ...(selectedReviewForDetails.notes
+        ? [
+            {
+              title: "Additional Notes",
+              items: [
+                {
+                  label: "Notes",
+                  value: selectedReviewForDetails.notes as string,
+                  colSpan: 2 as const,
+                },
+              ],
+            },
+          ]
+        : []),
+    ];
   };
 
   const columns: ColumnDef<ReviewType>[] = [
     {
-      accessorKey: "review_id",
-      header: "ID",
-      cell: ({ row }) => (
-        <div className="font-mono text-xs w-32 truncate">
-          {row.getValue("review_id")}
-        </div>
-      ),
-    },
-    {
       accessorKey: "submission_id",
-      header: "Submission ID",
+      header: () => <div>Submission ID</div>,
       cell: ({ row }) => (
-        <div className="font-mono text-xs w-32 truncate">
+        <div className="font-mono text-xs truncate max-w-[120px] md:max-w-none">
           {row.getValue("submission_id")}
         </div>
       ),
     },
     {
       accessorKey: "reviewer_name",
-      header: "Reviewer",
+      header: () => <div>Reviewer</div>,
       cell: ({ row }) => (
-        <div className="w-32 truncate">{row.getValue("reviewer_name")}</div>
+        <div className="truncate max-w-[120px] md:max-w-none">
+          {row.getValue("reviewer_name")}
+        </div>
       ),
     },
     {
       accessorKey: "review_status",
-      header: "Status",
+      header: () => <div>Status</div>,
       cell: ({ row }) => getStatusBadge(row.getValue("review_status")),
     },
     {
       accessorKey: "review_timestamp",
-      header: "Review Date",
+      header: () => <div>Review Date</div>,
+      cell: ({ row }) => (
+        <div>{formatDate(new Date(row.getValue("review_timestamp")))}</div>
+      ),
+    },
+    {
+      accessorKey: "special_review_required",
+      header: () => <div>Special Review</div>,
+      cell: ({ row }) => (
+        <div>{row.getValue("special_review_required") ? "Yes" : "No"}</div>
+      ),
+    },
+    {
+      id: "actions",
+      header: () => <div>Actions</div>,
       cell: ({ row }) => {
-        const date = row.getValue<Date>("review_timestamp");
         return (
-          <div className="w-28 truncate">
-            {format(new Date(date), "dd MMM yyyy")}
+          <div className="flex justify-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleEditClick(row.original.review_id)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleDeleteClick(row.original.review_id)}
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleDetailsClick(row.original)}
+            >
+              <Info className="h-4 w-4" />
+            </Button>
           </div>
         );
       },
     },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <div className="flex space-x-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleEditClick(row.original.review_id)}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleDeleteClick(row.original.review_id)}
-          >
-            <Trash2 className="h-4 w-4 text-red-500" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleViewDetails(row.original)}
-          >
-            <Info className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
-    },
   ];
 
-  const filteredData = reviews.filter(
-    (review) =>
-      review.review_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      review.submission_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      review.reviewer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      review.review_status?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      review.updated_by?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   return (
-    <div className="p-8">
-      <div className="mb-8 flex justify-between items-center">
-        <h1 className="text-2xl font-semibold">Reviews</h1>
-        <div className="flex gap-2">
-          <div className="relative">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleFileUpload}
-              className="hidden"
-              id="csv-upload"
-            />
-            <Button
-              variant="outline"
-              onClick={() => document.getElementById("csv-upload")?.click()}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Upload CSV
-            </Button>
-          </div>
-          <Button onClick={handleAddClick}>
+    <div className="flex flex-col gap-4 p-4">
+      <h1 className="text-xl sm:text-2xl font-semibold">Review Management</h1>
+      <div className="flex flex-wrap justify-between items-center gap-2">
+        <div className="relative flex flex-1 items-center gap-2">
+          <Button
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={handleAddClick}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Review
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => document.getElementById("csv-upload")?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Upload CSV
+          </Button>
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleFileChange}
+            className="hidden"
+            id="csv-upload"
+          />
         </div>
-      </div>
 
-      <div className="mb-6 flex gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <div className="relative flex flex-1 items-center justify-center gap-2 p-2 min-w-16">
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
           <Input
             className="pl-10"
             placeholder="Search reviews..."
@@ -275,6 +368,7 @@ export function Review() {
         </div>
       </div>
 
+      {/* Data Table */}
       <DataTable
         columns={columns}
         data={filteredData}
@@ -282,55 +376,48 @@ export function Review() {
         pageSize={10}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete this
-              review.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Add/Edit Form Dialog */}
-      {isFormDialogOpen && (
-        <ReviewForm
-          reviewId={selectedReviewId || undefined}
-          open={isFormDialogOpen}
-          onClose={handleFormClose}
-          onSuccess={handleFormSuccess}
-        />
-      )}
+      <ReviewForm
+        reviewId={selectedReviewId}
+        open={isFormDialogOpen}
+        onClose={() => setIsFormDialogOpen(false)}
+        onSuccess={handleFormSuccess}
+      />
 
       {/* Details Dialog */}
-      {viewDetailsOpen && selectedReview && (
-        <ReviewDetails
-          review={selectedReview}
-          open={viewDetailsOpen}
-          onClose={() => setViewDetailsOpen(false)}
+      {selectedReviewForDetails && (
+        <DetailsDialog
+          title={`Review: ${selectedReviewForDetails.review_id}`}
+          open={isDetailsDialogOpen}
+          onClose={() => setIsDetailsDialogOpen(false)}
+          sections={getReviewDetailSections()}
         />
       )}
 
       {/* CSV Preview Dialog */}
-      <CSVPreviewDialog
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        data={csvData}
-        fileName={csvFileName}
-        onConfirm={handleConfirmCsvUpload}
-        validationErrors={validationErrors}
+      {uploadFile && (
+        <CSVPreviewDialog
+          isOpen={isCSVDialogOpen}
+          onClose={handleCSVDialogClose}
+          data={csvData}
+          fileName={uploadFile.name}
+          onConfirm={handleCsvUpload}
+          validationErrors={csvValidationErrors}
+          title="Import Reviews"
+          description="Review data before import"
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onDelete={deleteReview.mutateAsync}
+        itemId={reviewToDelete}
+        title="Delete Review"
+        description="Are you sure you want to delete this review? This action cannot be undone."
+        successMessage="Review deleted successfully"
+        errorMessage="Failed to delete review"
       />
     </div>
   );

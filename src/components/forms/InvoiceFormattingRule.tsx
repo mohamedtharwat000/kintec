@@ -1,8 +1,7 @@
 import React, { useEffect } from "react";
-import { Save, X, Loader2 } from "lucide-react";
+import { Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +22,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
+  useInvoiceFormattingRule,
+  useCreateInvoiceFormattingRule,
+  useUpdateInvoiceFormattingRule,
+} from "@/hooks/useInvoiceFormattingRules";
+import { useInvoices } from "@/hooks/useInvoices";
+import {
   Form,
   FormControl,
   FormField,
@@ -30,18 +35,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  useInvoiceFormattingRule,
-  useCreateInvoiceFormattingRule,
-  useUpdateInvoiceFormattingRule,
-} from "@/hooks/useInvoiceFormattingRules";
-import { useInvoices } from "@/hooks/useInvoices";
+import { tryCatch } from "@/lib/utils";
 
 const formSchema = z.object({
   invoice_id: z.string().min(1, "Invoice is required"),
-  file_format: z.string().optional(),
-  required_invoice_fields: z.string().optional(),
-  attachment_requirements: z.string().optional(),
+  file_format: z.string().optional().nullable(),
+  required_invoice_fields: z.string().optional().nullable(),
+  attachment_requirements: z.string().optional().nullable(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -97,10 +97,10 @@ export function InvoiceFormattingRuleForm({
   }, [existingRule, form, isEditing, open]);
 
   const onSubmit = async (data: FormData) => {
-    try {
+    const { error } = await tryCatch(async () => {
       if (isEditing) {
         await updateRule.mutateAsync({
-          id: ruleId,
+          id: ruleId!,
           data: {
             ...data,
           },
@@ -108,7 +108,10 @@ export function InvoiceFormattingRuleForm({
         toast.success("Invoice formatting rule updated successfully");
       } else {
         await createRule.mutateAsync({
-          ...data,
+          invoice_id: data.invoice_id,
+          file_format: data.file_format || null,
+          required_invoice_fields: data.required_invoice_fields || null,
+          attachment_requirements: data.attachment_requirements || null,
         });
         toast.success("Invoice formatting rule added successfully");
       }
@@ -117,7 +120,9 @@ export function InvoiceFormattingRuleForm({
         onSuccess();
       }
       onClose();
-    } catch (error) {
+    });
+
+    if (error) {
       console.error(error);
       toast.error(
         isEditing
@@ -130,16 +135,23 @@ export function InvoiceFormattingRuleForm({
   const isSubmitting = createRule.isPending || updateRule.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!isSubmitting && !open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-[80vw] max-h-[80vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Formatting Rule" : "Add New Formatting Rule"}
           </DialogTitle>
           <DialogDescription>
             {isEditing
-              ? "Update formatting rule details."
-              : "Enter details for the new formatting rule."}
+              ? "Update invoice formatting rule details."
+              : "Define formatting requirements for invoices."}
           </DialogDescription>
         </DialogHeader>
 
@@ -160,11 +172,11 @@ export function InvoiceFormattingRuleForm({
                       onValueChange={field.onChange}
                       defaultValue={field.value}
                       value={field.value}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || isEditing}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select invoice" />
+                          <SelectValue placeholder="Select an invoice" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -173,8 +185,7 @@ export function InvoiceFormattingRuleForm({
                             key={invoice.invoice_id}
                             value={invoice.invoice_id}
                           >
-                            {invoice.invoice_id} - {invoice.invoice_currency}{" "}
-                            {invoice.invoice_total_value}
+                            {invoice.invoice_id}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -192,9 +203,10 @@ export function InvoiceFormattingRuleForm({
                     <FormLabel>File Format</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="e.g., PDF, Excel, CSV"
+                        placeholder="e.g., PDF, Excel, etc."
                         {...field}
                         value={field.value || ""}
+                        disabled={isSubmitting}
                       />
                     </FormControl>
                     <FormMessage />
@@ -209,11 +221,11 @@ export function InvoiceFormattingRuleForm({
                   <FormItem>
                     <FormLabel>Required Invoice Fields</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="List required fields for the invoice, separated by commas"
-                        className="min-h-20"
+                      <Input
+                        placeholder="e.g., Date, Invoice Number, etc."
                         {...field}
                         value={field.value || ""}
+                        disabled={isSubmitting}
                       />
                     </FormControl>
                     <FormMessage />
@@ -228,11 +240,11 @@ export function InvoiceFormattingRuleForm({
                   <FormItem>
                     <FormLabel>Attachment Requirements</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Specify any requirements for attachments to the invoice"
-                        className="min-h-20"
+                      <Input
+                        placeholder="e.g., Timesheets, Receipts, etc."
                         {...field}
                         value={field.value || ""}
+                        disabled={isSubmitting}
                       />
                     </FormControl>
                     <FormMessage />
@@ -251,11 +263,16 @@ export function InvoiceFormattingRuleForm({
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {isEditing ? "Updating..." : "Saving..."}
+                    </>
                   ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isEditing ? "Update" : "Save"}
+                    </>
                   )}
-                  {isEditing ? "Update" : "Save"}
                 </Button>
               </DialogFooter>
             </form>

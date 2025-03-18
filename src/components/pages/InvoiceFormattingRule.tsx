@@ -5,6 +5,8 @@ import {
   useInvoiceFormattingRules,
   useDeleteInvoiceFormattingRule,
   useCreateInvoiceFormattingRule,
+  useSearchFilter,
+  useParseInvoiceFormattingRuleCsv,
 } from "@/hooks/useInvoiceFormattingRules";
 import { DataTable } from "@/components/dataTable/DataTable";
 import { ColumnDef } from "@tanstack/react-table";
@@ -12,43 +14,66 @@ import { Button } from "@/components/ui/button";
 import { Plus, Search, Pencil, Trash2, Upload, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { InvoiceFormattingRuleForm } from "@/components/forms/InvoiceFormattingRule";
-import { InvoiceFormattingRuleDetails } from "@/components/000/InvoiceFormattingRule";
-import type { InvoiceFormattingRule } from "@/types/Invoice";
+import { InvoiceFormattingRule as InvoiceFormattingRuleType } from "@/types/InvoiceFormattingRule";
 import { toast } from "sonner";
-import { parseInvoiceFormattingRule } from "@/lib/csv/invoiceFormattingRule";
+import { CSVPreviewDialog } from "@/components/reusableModels/CSVPreviewDialog";
+import { DeleteConfirmationDialog } from "@/components/reusableModels/DeleteConfirmationDialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { CSVPreviewDialog } from "@/components/csvPreviewDialog/InvoiceFormattingRule";
+  DetailsDialog,
+  DetailSection,
+} from "@/components/reusableModels/DetailsDialog";
 
 export function InvoiceFormattingRule() {
-  const { data: formattingRules = [], isLoading } = useInvoiceFormattingRules();
+  // Core data fetching hook
+  const {
+    data: formattingRules = [],
+    isLoading,
+    refetch,
+  } = useInvoiceFormattingRules();
   const deleteFormattingRule = useDeleteInvoiceFormattingRule();
   const createFormattingRule = useCreateInvoiceFormattingRule();
+  const parseCSV = useParseInvoiceFormattingRuleCsv();
 
+  // Page-level state management
   const [searchTerm, setSearchTerm] = useState("");
-  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [ruleToDelete, setRuleToDelete] = useState<string | null>(null);
 
-  // CSV upload state
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [csvData, setCsvData] = useState<Partial<InvoiceFormattingRule>[]>([]);
-  const [csvFileName, setCsvFileName] = useState("");
-  const [validationErrors, setValidationErrors] = useState<
+  // Form dialog state
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [selectedRuleId, setSelectedRuleId] = useState<string | undefined>();
+
+  // Details dialog state
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [selectedRuleForDetails, setSelectedRuleForDetails] = useState<
+    InvoiceFormattingRuleType | undefined
+  >(undefined);
+
+  // CSV dialog state
+  const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvValidationErrors, setCsvValidationErrors] = useState<
     { row: number; error: string }[]
   >([]);
 
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [ruleToDelete, setRuleToDelete] = useState<string | null>(null);
+
+  // Filter data based on search term
+  const filteredData = useSearchFilter<InvoiceFormattingRuleType>(
+    formattingRules,
+    searchTerm,
+    [
+      "inv_formatting_rule_id",
+      "invoice_id",
+      "file_format",
+      "required_invoice_fields",
+    ]
+  );
+
+  // Simple handlers for UI actions
   const handleAddClick = () => {
-    setSelectedRuleId(null);
+    setSelectedRuleId(undefined);
     setIsFormDialogOpen(true);
   };
 
@@ -57,83 +82,100 @@ export function InvoiceFormattingRule() {
     setIsFormDialogOpen(true);
   };
 
+  const handleDetailsClick = (rule: InvoiceFormattingRuleType) => {
+    setSelectedRuleForDetails(rule);
+    setIsDetailsDialogOpen(true);
+  };
+
   const handleDeleteClick = (ruleId: string) => {
     setRuleToDelete(ruleId);
     setDeleteDialogOpen(true);
   };
 
-  const handleFormClose = () => {
-    setIsFormDialogOpen(false);
-  };
-
-  const handleFormSuccess = () => {
-    setIsFormDialogOpen(false);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!ruleToDelete) return;
-
-    try {
-      await deleteFormattingRule.mutateAsync(ruleToDelete);
-      toast.success("Invoice formatting rule deleted successfully");
-    } catch (error) {
-      toast.error("Failed to delete invoice formatting rule");
-    } finally {
-      setDeleteDialogOpen(false);
-      setRuleToDelete(null);
-    }
-  };
-
-  const handleFileUpload = async (
+  const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      setUploadFile(file);
 
-    try {
-      const result = await parseInvoiceFormattingRule(file);
-      setCsvFileName(file.name);
-      setCsvData(result.data);
+      const result = await parseCSV(file);
+      if (result.data) {
+        setCsvData(result.data.data);
+        setCsvValidationErrors(result.data.errors);
+        setIsCSVDialogOpen(true);
+      } else if (result.error) {
+        toast.error(`Failed to parse CSV: ${result.error.message}`);
+      }
 
-      // Validate data
-      const errors: { row: number; error: string }[] = [];
-      result.data.forEach((item, index) => {
-        if (!item.invoice_id) {
-          errors.push({ row: index + 1, error: "Invoice ID is required" });
-        }
-      });
-
-      setValidationErrors(errors);
-
-      // Show preview dialog
-      setIsPreviewOpen(true);
-    } catch (error) {
-      console.error("Error parsing CSV:", error);
-      toast.error("Failed to parse CSV file");
-    } finally {
-      // Reset the file input
       event.target.value = "";
     }
   };
 
-  // Handle CSV data import confirmation
-  const handleConfirmCsvUpload = async () => {
-    try {
-      // Process each rule one by one
-      for (const rule of csvData) {
-        await createFormattingRule.mutateAsync(rule as any);
-      }
+  const handleCSVDialogClose = () => {
+    setIsCSVDialogOpen(false);
+    setCsvData([]);
+    setCsvValidationErrors([]);
+    setUploadFile(null);
+  };
 
+  const handleCsvUpload = async () => {
+    if (!csvData.length) return;
+
+    try {
+      await createFormattingRule.mutateAsync(csvData);
       toast.success(`Successfully imported ${csvData.length} formatting rules`);
-      return Promise.resolve();
+      refetch();
+      setIsCSVDialogOpen(false);
+
+      setCsvData([]);
+      setCsvValidationErrors([]);
+      setUploadFile(null);
     } catch (error) {
-      console.error("Error importing CSV data:", error);
-      toast.error("Failed to import formatting rules from CSV");
-      return Promise.reject(error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to import formatting rules: ${errorMessage}`);
     }
   };
 
-  const columns: ColumnDef<InvoiceFormattingRule>[] = [
+  const handleFormSuccess = () => {
+    refetch();
+    setIsFormDialogOpen(false);
+  };
+
+  // Generate detail sections for the rule
+  const getRuleDetailSections = (): DetailSection[] => {
+    if (!selectedRuleForDetails) return [];
+
+    return [
+      {
+        title: "Invoice Formatting Rule Information",
+        items: [
+          {
+            label: "Rule ID",
+            value: selectedRuleForDetails.inv_formatting_rule_id,
+          },
+          { label: "Invoice ID", value: selectedRuleForDetails.invoice_id },
+          {
+            label: "File Format",
+            value: selectedRuleForDetails.file_format || "Not specified",
+          },
+          {
+            label: "Required Invoice Fields",
+            value:
+              selectedRuleForDetails.required_invoice_fields || "Not specified",
+          },
+          {
+            label: "Attachment Requirements",
+            value:
+              selectedRuleForDetails.attachment_requirements || "Not specified",
+          },
+        ],
+      },
+    ];
+  };
+
+  const columns: ColumnDef<InvoiceFormattingRuleType>[] = [
     {
       accessorKey: "inv_formatting_rule_id",
       header: "ID",
@@ -186,7 +228,7 @@ export function InvoiceFormattingRule() {
       id: "actions",
       header: "Actions",
       cell: ({ row }) => (
-        <div className="flex space-x-2">
+        <div className="flex justify-center gap-2">
           <Button
             variant="ghost"
             size="icon"
@@ -203,54 +245,53 @@ export function InvoiceFormattingRule() {
           >
             <Trash2 className="h-4 w-4 text-red-500" />
           </Button>
-          <InvoiceFormattingRuleDetails rule={row.original} />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleDetailsClick(row.original)}
+          >
+            <Info className="h-4 w-4" />
+          </Button>
         </div>
       ),
     },
   ];
 
-  const filteredData = formattingRules.filter(
-    (rule) =>
-      rule.invoice_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (rule.file_format || "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      (rule.required_invoice_fields || "")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase())
-  );
-
   return (
-    <div className="p-8">
-      <div className="mb-8 flex justify-between items-center">
-        <h1 className="text-2xl font-semibold">Invoice Formatting Rules</h1>
-        <div className="flex gap-2">
-          <div className="relative">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleFileUpload}
-              className="hidden"
-              id="csv-upload"
-            />
-            <Button
-              variant="outline"
-              onClick={() => document.getElementById("csv-upload")?.click()}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Upload CSV
-            </Button>
-          </div>
-          <Button onClick={handleAddClick}>
+    <div className="flex flex-col gap-4 p-4">
+      <h1 className="text-xl sm:text-2xl font-semibold">
+        Invoice Formatting Rules
+      </h1>
+      <div className="flex flex-wrap justify-between items-center gap-2">
+        <div className="relative flex flex-1 items-center gap-2">
+          <Button
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={handleAddClick}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Rule
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => document.getElementById("csv-upload")?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Upload CSV
+          </Button>
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleFileChange}
+            className="hidden"
+            id="csv-upload"
+          />
         </div>
-      </div>
 
-      <div className="mb-6 flex gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <div className="relative flex flex-1 items-center justify-center gap-2 p-2 min-w-16">
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
           <Input
             className="pl-10"
             placeholder="Search formatting rules..."
@@ -260,6 +301,7 @@ export function InvoiceFormattingRule() {
         </div>
       </div>
 
+      {/* Data Table */}
       <DataTable
         columns={columns}
         data={filteredData}
@@ -269,42 +311,46 @@ export function InvoiceFormattingRule() {
 
       {/* Add/Edit Form Dialog */}
       <InvoiceFormattingRuleForm
-        ruleId={selectedRuleId || undefined}
+        ruleId={selectedRuleId}
         open={isFormDialogOpen}
-        onClose={handleFormClose}
+        onClose={() => setIsFormDialogOpen(false)}
         onSuccess={handleFormSuccess}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              formatting rule and may affect related records.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Details Dialog */}
+      {selectedRuleForDetails && (
+        <DetailsDialog
+          title={`Invoice Formatting Rule: ${selectedRuleForDetails.inv_formatting_rule_id}`}
+          open={isDetailsDialogOpen}
+          onClose={() => setIsDetailsDialogOpen(false)}
+          sections={getRuleDetailSections()}
+        />
+      )}
 
       {/* CSV Preview Dialog */}
-      <CSVPreviewDialog
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        data={csvData}
-        fileName={csvFileName}
-        onConfirm={handleConfirmCsvUpload}
-        validationErrors={validationErrors}
+      {uploadFile && (
+        <CSVPreviewDialog
+          isOpen={isCSVDialogOpen}
+          onClose={handleCSVDialogClose}
+          data={csvData}
+          fileName={uploadFile.name}
+          onConfirm={handleCsvUpload}
+          validationErrors={csvValidationErrors}
+          title="Import Invoice Formatting Rules"
+          description="Review rule data before import"
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onDelete={deleteFormattingRule.mutateAsync}
+        itemId={ruleToDelete}
+        title="Delete Invoice Formatting Rule"
+        description="Are you sure you want to delete this formatting rule? This action cannot be undone."
+        successMessage="Invoice formatting rule deleted successfully"
+        errorMessage="Failed to delete invoice formatting rule"
       />
     </div>
   );

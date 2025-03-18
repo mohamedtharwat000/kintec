@@ -10,11 +10,12 @@ export async function GET() {
   try {
     const projectRules = await getAllProjectRules();
     return NextResponse.json(projectRules, { status: 200 });
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }
@@ -26,13 +27,12 @@ export async function POST(request: Request) {
     const projectRules = await createProjectRule(requestData);
 
     return NextResponse.json(projectRules, { status: 201 });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    } else {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      return NextResponse.json({ error: errorMessage }, { status: 500 });
-    }
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
+    return NextResponse.json(
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
+    );
   }
 }

@@ -4,13 +4,14 @@ import {
   updatePurchaseOrder,
   deletePurchaseOrder,
 } from "@/services/purchase_orders/purchaseOrderService";
+import { Prisma } from "@prisma/client";
 
 export async function GET(
   request: Request,
-  context: { params: { po_id: string } }
+  context: { params: Promise<{ po_id: string }> }
 ) {
   try {
-    const { po_id } = context.params;
+    const { po_id } = await context.params;
     const purchaseOrder = await getPurchaseOrderById(po_id);
 
     if (!purchaseOrder) {
@@ -21,47 +22,53 @@ export async function GET(
     }
 
     return NextResponse.json(purchaseOrder, { status: 200 });
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }
 
 export async function PUT(
   request: Request,
-  context: { params: { po_id: string } }
+  context: { params: Promise<{ po_id: string }> }
 ) {
   try {
-    const { po_id } = context.params;
+    const { po_id } = await context.params;
     const body = await request.json();
 
     const updated = await updatePurchaseOrder(po_id, body);
     return NextResponse.json(updated, { status: 200 });
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }
 
 export async function DELETE(
   request: Request,
-  context: { params: { po_id: string } }
+  context: { params: Promise<{ po_id: string }> }
 ) {
   try {
-    const { po_id } = context.params;
+    const { po_id } = await context.params;
     await deletePurchaseOrder(po_id);
-    return new NextResponse(null, { status: 204 });
-  } catch (error) {
-    console.error(error);
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { message: "Purchase Order deleted successfully" },
+      { status: 200 }
+    );
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
+    return NextResponse.json(
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }

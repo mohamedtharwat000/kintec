@@ -49,6 +49,9 @@ export function useDeleteSubmissionValidationRule() {
       queryClient.invalidateQueries({
         queryKey: ["submissionValidationRules"],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["submissions"],
+      });
     },
   });
 }
@@ -83,6 +86,9 @@ export function useUpdateSubmissionValidationRule() {
       queryClient.invalidateQueries({
         queryKey: ["submissionValidationRules", variables.id],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["submissions"],
+      });
     },
   });
 }
@@ -111,8 +117,22 @@ export function useCreateSubmissionValidationRule() {
       queryClient.invalidateQueries({
         queryKey: ["submissionValidationRules"],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["submissions"],
+      });
     },
   });
+}
+
+export function useParseSubmissionValidationRuleCsv() {
+  return async (file: File) => {
+    const { data, error } = await tryCatch(async () => {
+      const result = await parseSubmissionValidationRule(file);
+      return result;
+    });
+    if (error) return { error };
+    return { data };
+  };
 }
 
 export function useSearchFilter<T extends Record<string, any>>(
@@ -133,15 +153,4 @@ export function useSearchFilter<T extends Record<string, any>>(
       );
     })
   );
-}
-
-export function useParseSubmissionValidationRuleCsv() {
-  return async (file: File) => {
-    const { data, error } = await tryCatch(async () => {
-      const result = await parseSubmissionValidationRule(file);
-      return result;
-    });
-    if (error) return { error };
-    return { data };
-  };
 }

@@ -3,7 +3,6 @@ import { Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +20,7 @@ import {
   useCreateReview,
   useUpdateReview,
 } from "@/hooks/useReviews";
+import { useSubmissions } from "@/hooks/useSubmissions";
 import {
   Form,
   FormControl,
@@ -29,8 +29,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { useSubmissions } from "@/hooks/useSubmissions";
-import { ReviewStatus, OverallValidationStatus } from "@/types/Review";
 import {
   Select,
   SelectContent,
@@ -39,6 +37,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { DatePicker } from "@/components/ui/date-picker";
+import { ReviewStatus, OverallValidationStatus } from "@/types/Review";
+import { tryCatch } from "@/lib/utils";
 
 // Define the schema for the form
 const formSchema = z.object({
@@ -72,9 +73,8 @@ export function ReviewForm({
   onSuccess,
 }: ReviewFormProps) {
   const isEditing = !!reviewId;
-  const { data: existingReview, isLoading: isLoadingReview } = useReview(
-    reviewId || ""
-  );
+  const { data: existingReview, isLoading: isLoadingReview } =
+    useReview(reviewId);
   const createReview = useCreateReview();
   const updateReview = useUpdateReview();
   const { data: submissions = [] } = useSubmissions();
@@ -86,8 +86,10 @@ export function ReviewForm({
       special_review_required: false,
       reviewer_name: "",
       review_status: ReviewStatus.pending,
+      review_timestamp: new Date(),
       review_rejection_reason: "",
       overall_validation_status: OverallValidationStatus.approved,
+      last_overall_validation_date: new Date(),
       updated_by: "",
       notes: "",
     },
@@ -100,26 +102,42 @@ export function ReviewForm({
         submission_id: existingReview.submission_id,
         special_review_required: existingReview.special_review_required,
         reviewer_name: existingReview.reviewer_name,
-        review_status: existingReview.review_status,
+        review_status: existingReview.review_status as ReviewStatus,
         review_timestamp: new Date(existingReview.review_timestamp),
         review_rejection_reason: existingReview.review_rejection_reason || "",
-        overall_validation_status: existingReview.overall_validation_status,
+        overall_validation_status:
+          existingReview.overall_validation_status as OverallValidationStatus,
         last_overall_validation_date: new Date(
           existingReview.last_overall_validation_date
         ),
         updated_by: existingReview.updated_by,
         notes: existingReview.notes || "",
       });
+    } else if (!isEditing && open) {
+      // Reset form when opening in create mode
+      form.reset({
+        submission_id: "",
+        special_review_required: false,
+        reviewer_name: "",
+        review_status: ReviewStatus.pending,
+        review_timestamp: new Date(),
+        review_rejection_reason: "",
+        overall_validation_status: OverallValidationStatus.approved,
+        last_overall_validation_date: new Date(),
+        updated_by: "",
+        notes: "",
+      });
     }
-  }, [existingReview, form, isEditing]);
+  }, [existingReview, form, isEditing, open]);
 
   const onSubmit = async (data: FormData) => {
-    try {
+    const { error } = await tryCatch(async () => {
       const reviewData = {
         ...data,
-        review_timestamp: data.review_timestamp.toISOString(),
-        last_overall_validation_date:
-          data.last_overall_validation_date.toISOString(),
+        review_timestamp: data.review_timestamp,
+        last_overall_validation_date: data.last_overall_validation_date,
+        review_rejection_reason: data.review_rejection_reason || null,
+        notes: data.notes || null,
       };
 
       if (isEditing) {
@@ -137,7 +155,9 @@ export function ReviewForm({
         onSuccess();
       }
       onClose();
-    } catch (error) {
+    });
+
+    if (error) {
       console.error(error);
       toast.error(
         isEditing ? "Failed to update review" : "Failed to create review"
@@ -149,8 +169,15 @@ export function ReviewForm({
   const watchReviewStatus = form.watch("review_status");
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!isSubmitting && !open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-[80vw] max-h-[80vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Review" : "Add New Review"}
@@ -178,6 +205,7 @@ export function ReviewForm({
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value}
+                      value={field.value}
                       disabled={isSubmitting || isEditing}
                     >
                       <FormControl>
@@ -249,6 +277,7 @@ export function ReviewForm({
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value}
+                      value={field.value}
                       disabled={isSubmitting}
                     >
                       <FormControl>
@@ -318,6 +347,7 @@ export function ReviewForm({
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value}
+                      value={field.value}
                       disabled={isSubmitting}
                     >
                       <FormControl>
@@ -391,7 +421,7 @@ export function ReviewForm({
                 )}
               />
 
-              <DialogFooter>
+              <DialogFooter className="pt-4">
                 <Button
                   variant="outline"
                   onClick={onClose}
@@ -402,11 +432,16 @@ export function ReviewForm({
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {isEditing ? "Updating..." : "Saving..."}
+                    </>
                   ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isEditing ? "Update" : "Save"}
+                    </>
                   )}
-                  {isEditing ? "Update" : "Save"}
                 </Button>
               </DialogFooter>
             </form>

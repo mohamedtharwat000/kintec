@@ -52,14 +52,14 @@ export function DataTable<TData>({
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="flex items-center justify-center w-full h-full">
         <Loader2 className="h-6 w-6 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <>
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -110,7 +110,7 @@ export function DataTable<TData>({
         isLoading={loading}
         manualPagination={manualPagination}
       />
-    </div>
+    </>
   );
 }
 

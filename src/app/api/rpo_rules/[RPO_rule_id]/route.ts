@@ -4,15 +4,16 @@ import {
   updateRpoRule,
   deleteRpoRule,
 } from "@/services/rpo_rules/RpoRuleService";
+import { Prisma } from "@prisma/client";
 
 export async function GET(
   request: Request,
-  context: { params: { RPO_rule_id: string } }
+  context: { params: Promise<{ RPO_rule_id: string }> }
 ) {
   try {
-    const params = await context.params;
+    const { RPO_rule_id } = await context.params;
 
-    const RPO_rule = await getRpoRuleById(params.RPO_rule_id);
+    const RPO_rule = await getRpoRuleById(RPO_rule_id);
     if (!RPO_rule) {
       return NextResponse.json(
         { error: "RPO Rule not found" },
@@ -20,47 +21,52 @@ export async function GET(
       );
     }
     return NextResponse.json(RPO_rule, { status: 200 });
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }
 
 export async function PUT(
   request: Request,
-  context: { params: { RPO_rule_id: string } }
+  context: { params: Promise<{ RPO_rule_id: string }> }
 ) {
   try {
-    const params = await context.params;
+    const { RPO_rule_id } = await context.params;
     const body = await request.json();
-    const updated = await updateRpoRule(params.RPO_rule_id, body);
+    const updated = await updateRpoRule(RPO_rule_id, body);
     return NextResponse.json(updated, { status: 200 });
-  } catch (error: any) {
-    console.error(error);
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }
 
 export async function DELETE(
   request: Request,
-  context: { params: { RPO_rule_id: string } }
+  context: { params: Promise<{ RPO_rule_id: string }> }
 ) {
   try {
-    const params = await context.params;
-    await deleteRpoRule(params.RPO_rule_id);
-    // 204 responses typically have no body.
-    return new NextResponse(null, { status: 204 });
-  } catch (error) {
-    console.error(error);
+    const { RPO_rule_id } = await context.params;
+    await deleteRpoRule(RPO_rule_id);
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { message: "RPO Rule deleted successfully" },
+      { status: 200 }
+    );
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
+    return NextResponse.json(
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }

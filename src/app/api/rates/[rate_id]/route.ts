@@ -4,65 +4,66 @@ import {
   updateRate,
   deleteRate,
 } from "@/services/rates/rateService";
+import { Prisma } from "@prisma/client";
 
 export async function GET(
   request: Request,
-  context: { params: { rate_id: string } }
+  context: { params: Promise<{ rate_id: string }> }
 ) {
   try {
-    const params = await context.params;
+    const { rate_id } = await context.params;
 
-    const rate = await getRateById(params.rate_id);
+    const rate = await getRateById(rate_id);
     if (!rate) {
       return NextResponse.json({ error: "Rate not found" }, { status: 404 });
     }
     return NextResponse.json(rate, { status: 200 });
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }
 
 export async function PUT(
   request: Request,
-  context: { params: { rate_id: string } }
+  context: { params: Promise<{ rate_id: string }> }
 ) {
   try {
-    const params = await context.params;
+    const { rate_id } = await context.params;
     const body = await request.json();
-    const updated = await updateRate(params.rate_id, body);
+    const updated = await updateRate(rate_id, body);
     return NextResponse.json(updated, { status: 200 });
-  } catch (error: any) {
-    console.error(error);
-
-    if (error.message?.includes("PO_id or CWO_id")) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }
 
 export async function DELETE(
   request: Request,
-  context: { params: { rate_id: string } }
+  context: { params: Promise<{ rate_id: string }> }
 ) {
   try {
-    const params = await context.params;
-    await deleteRate(params.rate_id);
-    // 204 responses typically have no body
-    return new NextResponse(null, { status: 204 });
-  } catch (error) {
-    console.error(error);
+    const { rate_id } = await context.params;
+    await deleteRate(rate_id);
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { message: "Rate deleted successfully" },
+      { status: 200 }
+    );
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
+    return NextResponse.json(
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }

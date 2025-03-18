@@ -1,8 +1,6 @@
 import React, { useEffect } from "react";
 import { Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +27,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useSubmissions } from "@/hooks/useSubmissions";
-import { RequiredFields } from "@/types/Submission";
+import { RequiredFields } from "@/types/SubmissionValidationRule";
 import {
   Select,
   SelectContent,
@@ -37,13 +35,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { tryCatch } from "@/lib/utils";
 
 // Define the schema for the form
 const formSchema = z.object({
   submission_id: z.string().min(1, "Submission ID is required"),
   approval_signature_rules: z.string().optional(),
   approval_date_rules: z.string().optional(),
-  required_fields: z.enum([RequiredFields.REG, RequiredFields.EXP]).optional(),
+  required_fields: z.nativeEnum(RequiredFields).optional(),
   template_requirements: z.string().optional(),
   workday_definitions: z.string().optional(),
 });
@@ -76,6 +76,7 @@ export function SubmissionValidationRuleForm({
       submission_id: "",
       approval_signature_rules: "",
       approval_date_rules: "",
+      required_fields: undefined,
       template_requirements: "",
       workday_definitions: "",
     },
@@ -88,15 +89,26 @@ export function SubmissionValidationRuleForm({
         submission_id: existingRule.submission_id,
         approval_signature_rules: existingRule.approval_signature_rules || "",
         approval_date_rules: existingRule.approval_date_rules || "",
-        required_fields: existingRule.required_fields,
+        required_fields:
+          (existingRule.required_fields as RequiredFields) || undefined,
         template_requirements: existingRule.template_requirements || "",
         workday_definitions: existingRule.workday_definitions || "",
       });
+    } else if (!isEditing && open) {
+      // Reset form when opening in create mode
+      form.reset({
+        submission_id: "",
+        approval_signature_rules: "",
+        approval_date_rules: "",
+        required_fields: undefined,
+        template_requirements: "",
+        workday_definitions: "",
+      });
     }
-  }, [existingRule, form, isEditing]);
+  }, [existingRule, form, isEditing, open]);
 
   const onSubmit = async (data: FormData) => {
-    try {
+    const { error } = await tryCatch(async () => {
       if (isEditing) {
         await updateRule.mutateAsync({
           id: ruleId!,
@@ -104,7 +116,14 @@ export function SubmissionValidationRuleForm({
         });
         toast.success("Validation rule updated successfully");
       } else {
-        await createRule.mutateAsync(data);
+        await createRule.mutateAsync({
+          submission_id: data.submission_id,
+          approval_signature_rules: data.approval_signature_rules || null,
+          approval_date_rules: data.approval_date_rules || null,
+          required_fields: data.required_fields || null,
+          template_requirements: data.template_requirements || null,
+          workday_definitions: data.workday_definitions || null,
+        });
         toast.success("Validation rule added successfully");
       }
 
@@ -112,7 +131,9 @@ export function SubmissionValidationRuleForm({
         onSuccess();
       }
       onClose();
-    } catch (error) {
+    });
+
+    if (error) {
       console.error(error);
       toast.error(
         isEditing
@@ -125,8 +146,15 @@ export function SubmissionValidationRuleForm({
   const isSubmitting = createRule.isPending || updateRule.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!isSubmitting && !open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-[80vw] max-h-[80vh] overflow-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Validation Rule" : "Add New Validation Rule"}
@@ -154,6 +182,7 @@ export function SubmissionValidationRuleForm({
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value}
+                      value={field.value}
                       disabled={isSubmitting || isEditing}
                     >
                       <FormControl>
@@ -279,7 +308,7 @@ export function SubmissionValidationRuleForm({
                 )}
               />
 
-              <DialogFooter>
+              <DialogFooter className="pt-4">
                 <Button
                   variant="outline"
                   onClick={onClose}
@@ -290,11 +319,16 @@ export function SubmissionValidationRuleForm({
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {isEditing ? "Updating..." : "Saving..."}
+                    </>
                   ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isEditing ? "Update" : "Save"}
+                    </>
                   )}
-                  {isEditing ? "Update" : "Save"}
                 </Button>
               </DialogFooter>
             </form>

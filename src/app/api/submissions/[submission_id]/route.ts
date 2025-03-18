@@ -4,15 +4,16 @@ import {
   updateSubmission,
   deleteSubmission,
 } from "@/services/submissions/submissionService";
+import { Prisma } from "@prisma/client";
 
 export async function GET(
   request: Request,
-  context: { params: { submission_id: string } }
+  context: { params: Promise<{ submission_id: string }> }
 ) {
   try {
-    const params = await context.params;
+    const { submission_id } = await context.params;
 
-    const submission = await getSubmissionById(params.submission_id);
+    const submission = await getSubmissionById(submission_id);
     if (!submission) {
       return NextResponse.json(
         { error: "Submission not found" },
@@ -20,47 +21,52 @@ export async function GET(
       );
     }
     return NextResponse.json(submission, { status: 200 });
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }
 
 export async function PUT(
   request: Request,
-  context: { params: { submission_id: string } }
+  context: { params: Promise<{ submission_id: string }> }
 ) {
   try {
-    const params = await context.params;
+    const { submission_id } = await context.params;
     const body = await request.json();
-    const updated = await updateSubmission(params.submission_id, body);
+    const updated = await updateSubmission(submission_id, body);
     return NextResponse.json(updated, { status: 200 });
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }
 
 export async function DELETE(
   request: Request,
-  context: { params: { submission_id: string } }
+  context: { params: Promise<{ submission_id: string }> }
 ) {
   try {
-    const params = await context.params;
-    await deleteSubmission(params.submission_id);
-    // 204 responses typically have no body.
-    return new NextResponse(null, { status: 204 });
-  } catch (error) {
-    console.error(error);
+    const { submission_id } = await context.params;
+    await deleteSubmission(submission_id);
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { message: "Submission deleted successfully" },
+      { status: 200 }
+    );
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
+    return NextResponse.json(
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }

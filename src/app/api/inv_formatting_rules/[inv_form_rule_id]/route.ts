@@ -4,17 +4,16 @@ import {
   updateInvoiceFormattingRule,
   deleteInvoiceFormattingRule,
 } from "@/services/invoice_formatting_rules/invoiceFormattingRuleService";
+import { Prisma } from "@prisma/client";
 
 export async function GET(
   request: Request,
-  context: { params: { inv_for_rule_id: string } }
+  context: { params: Promise<{ inv_for_rule_id: string }> }
 ) {
   try {
-    const params = await context.params;
+    const { inv_for_rule_id } = await context.params;
 
-    const inv_for_rule = await getInvoiceFormattingRuleById(
-      params.inv_for_rule_id
-    );
+    const inv_for_rule = await getInvoiceFormattingRuleById(inv_for_rule_id);
     if (!inv_for_rule) {
       return NextResponse.json(
         { error: "Invoice Formatting Rule not found" },
@@ -22,54 +21,53 @@ export async function GET(
       );
     }
     return NextResponse.json(inv_for_rule, { status: 200 });
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }
 
 export async function PUT(
   request: Request,
-  context: { params: { inv_for_rule_id: string } }
+  context: { params: Promise<{ inv_for_rule_id: string }> }
 ) {
   try {
-    const params = await context.params;
-    //console.log("here1");
+    const { inv_for_rule_id } = await context.params;
     const body = await request.json();
-    //console.log("here2");
-    const updated = await updateInvoiceFormattingRule(
-      params.inv_for_rule_id,
-      body
-    );
-    //console.log("here3");
+    const updated = await updateInvoiceFormattingRule(inv_for_rule_id, body);
     return NextResponse.json(updated, { status: 200 });
-  } catch (error: any) {
-    //console.log("inside catch");
-    //console.error(error.code);
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }
 
 export async function DELETE(
   request: Request,
-  context: { params: { inv_for_rule_id: string } }
+  context: { params: Promise<{ inv_for_rule_id: string }> }
 ) {
   try {
-    const params = await context.params;
-    await deleteInvoiceFormattingRule(params.inv_for_rule_id);
-    // 204 responses typically have no body.
-    return new NextResponse(null, { status: 204 });
-  } catch (error) {
-    //console.error(error);
+    const { inv_for_rule_id } = await context.params;
+    await deleteInvoiceFormattingRule(inv_for_rule_id);
+
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { message: "Invoice Formatting Rule deleted successfully" },
+      { status: 200 }
+    );
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
+    return NextResponse.json(
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }

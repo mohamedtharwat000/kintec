@@ -235,7 +235,7 @@ export function ClientCompany() {
   ];
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="flex flex-col gap-4 p-4 min-h-full">
       <h1 className="text-xl sm:text-2xl font-semibold">Company Master Data</h1>
       <div className="flex flex-wrap justify-between items-center gap-2">
         <div className="relative flex flex-1 items-center gap-2">

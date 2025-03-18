@@ -4,63 +4,66 @@ import {
   updateExpenseValidationRule,
   deleteExpenseValidationRule,
 } from "@/services/expense_validation_rules/expenseValidationRuleService";
+import { Prisma } from "@prisma/client";
 
 export async function GET(
   request: Request,
-  context: { params: { exp_val_rule_id: string } }
+  context: { params: Promise<{ exp_val_rule_id: string }> }
 ) {
   try {
-    const params = await context.params;
+    const { exp_val_rule_id } = await context.params;
 
-    const rule = await getExpenseValidationRuleById(params.exp_val_rule_id);
+    const rule = await getExpenseValidationRuleById(exp_val_rule_id);
     if (!rule) {
       return NextResponse.json({ error: "Rule not found" }, { status: 404 });
     }
     return NextResponse.json(rule, { status: 200 });
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }
 
 export async function PUT(
   request: Request,
-  context: { params: { exp_val_rule_id: string } }
+  context: { params: Promise<{ exp_val_rule_id: string }> }
 ) {
   try {
-    const params = await context.params;
+    const { exp_val_rule_id } = await context.params;
     const body = await request.json();
-    const updated = await updateExpenseValidationRule(
-      params.exp_val_rule_id,
-      body
-    );
+    const updated = await updateExpenseValidationRule(exp_val_rule_id, body);
     return NextResponse.json(updated, { status: 200 });
-  } catch (error: any) {
-    console.error(error.code);
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }
 
 export async function DELETE(
   request: Request,
-  context: { params: { exp_val_rule_id: string } }
+  context: { params: Promise<{ exp_val_rule_id: string }> }
 ) {
   try {
-    const params = await context.params;
-    await deleteExpenseValidationRule(params.exp_val_rule_id);
-    // 204 responses typically have no body.
-    return new NextResponse(null, { status: 204 });
-  } catch (error) {
-    console.error(error);
+    const { exp_val_rule_id } = await context.params;
+    await deleteExpenseValidationRule(exp_val_rule_id);
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { message: "Expense Validation Rule deleted successfully" },
+      { status: 200 }
+    );
+  } catch (err) {
+    const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
+    const error = err instanceof Error ? err : new Error("Unknown error");
+    return NextResponse.json(
+      { error: error.message },
+      { status: isPrismaError ? 400 : 500 }
     );
   }
 }

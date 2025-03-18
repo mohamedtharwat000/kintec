@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo, useState } from "react";
+import React, { memo, useEffect, useState } from "react";
 import { AppSidebar } from "@/components/Sidebar";
 import { ClientCompany } from "@/components/pages/ClientCompany";
 import { Contractor } from "@/components/pages/Contractor";
@@ -24,7 +24,6 @@ import { Review } from "@/components/pages/Review";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { SiteHeader } from "@/components/header/site-header";
 import { useAppStore } from "@/store/useAppStore";
-import { useSidebar } from "@/components/ui/sidebar";
 import AppLogin from "@/components/Login";
 import { SidebarRail, SidebarTrigger } from "@/components/ui/sidebar";
 
@@ -32,17 +31,29 @@ interface AppProps {
   dashboard: React.ReactElement;
 }
 
+const LoadingSpinner = () => {
+  return (
+    <div className="flex h-screen w-screen items-center justify-center">
+      <div className="h-16 w-16 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
+    </div>
+  );
+};
+
 export function App({ dashboard }: AppProps) {
+  const [isLoading, setIsLoading] = useState(true);
   const { isAuthenticated } = useAppStore();
   const [currentView, setCurrentView] = useState<string>("dashboard");
-  const { openMobile, setOpenMobile } = useSidebar();
+
+  useEffect(() => {
+    const authCheckTimer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+
+    return () => clearTimeout(authCheckTimer);
+  }, []);
 
   const handleNavigation = (view: string) => {
     setCurrentView(view);
-  };
-
-  const toggleSidebar = () => {
-    setOpenMobile(!openMobile);
   };
 
   const renderView = () => {
@@ -75,24 +86,28 @@ export function App({ dashboard }: AppProps) {
         return <Expense />;
       case "expenseValidationRules":
         return <ExpenseValidationRule />;
-      // case "invoices":
-      //   return <Invoice />;
-      // case "invoiceFormattingRules":
-      //   return <InvoiceFormattingRule />;
-      // case "rates":
-      //   return <Rate />;
-      // case "submissions":
-      //   return <Submission />;
-      // case "submissionValidationRules":
-      //   return <SubmissionValidationRule />;
-      // case "reviews":
-      //   return <Review />;
+      case "invoices":
+        return <Invoice />;
+      case "invoiceFormattingRules":
+        return <InvoiceFormattingRule />;
+      case "rates":
+        return <Rate />;
+      case "submissions":
+        return <Submission />;
+      case "submissionValidationRules":
+        return <SubmissionValidationRule />;
+      case "reviews":
+        return <Review />;
     }
   };
 
-  // if (!isAuthenticated) {
-  //   return <AppLogin />;
-  // }
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
+  if (!isAuthenticated) {
+    return <AppLogin />;
+  }
 
   return (
     <div className="flex flex-col h-screen w-screen">
@@ -101,7 +116,7 @@ export function App({ dashboard }: AppProps) {
       <div className="flex flex-1 overflow-hidden relative">
         <AppSidebar currentView={currentView} onNavigation={handleNavigation} />
 
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto flex justify-center">
           <SidebarInset className="w-full">{renderView()}</SidebarInset>
         </div>
       </div>

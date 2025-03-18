@@ -598,25 +598,6 @@ export function AppSidebar({ currentView, onNavigation }: SidebarProps) {
                 </CollapsibleContent>
               </Collapsible>
 
-              {/* Rates - Add as a standalone menu item */}
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={currentView === "rates"}
-                  onClick={() => onNavigation("rates")}
-                  className={cn(
-                    "cursor-pointer transition-all relative",
-                    "hover:bg-accent",
-                    currentView === "rates" && ["!bg-gray-500"]
-                  )}
-                >
-                  <div className="flex items-center">
-                    <ArrowDownUp className="h-4 w-4 mr-2" />
-                    <span>Rates</span>
-                  </div>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
               {/* New Submissions Section */}
               <Collapsible
                 defaultOpen={
@@ -723,6 +704,25 @@ export function AppSidebar({ currentView, onNavigation }: SidebarProps) {
                   </SidebarMenu>
                 </CollapsibleContent>
               </Collapsible>
+
+              {/* Rates - Add as a standalone menu item */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={currentView === "rates"}
+                  onClick={() => onNavigation("rates")}
+                  className={cn(
+                    "cursor-pointer transition-all relative",
+                    "hover:bg-accent",
+                    currentView === "rates" && ["!bg-gray-500"]
+                  )}
+                >
+                  <div className="flex items-center">
+                    <ArrowDownUp className="h-4 w-4 mr-2" />
+                    <span>Rates</span>
+                  </div>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

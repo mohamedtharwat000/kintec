@@ -34,7 +34,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { tryCatch } from "@/lib/utils";
-import { Decimal } from "@prisma/client/runtime/library";
 
 // Schema for form validation
 const formSchema = z.object({
@@ -74,6 +73,22 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
   const createRate = useCreateRate();
   const updateRate = useUpdateRate();
 
+  // Safe function to get number value from potential Decimal object
+  const safelyGetNumber = (value: any): string => {
+    if (typeof value === "number") return value.toString();
+    if (value === null || value === undefined) return "";
+    // Handle Decimal objects from Prisma
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "toNumber" in value &&
+      typeof value.toNumber === "function"
+    ) {
+      return value.toNumber().toString();
+    }
+    return String(value);
+  };
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -105,7 +120,7 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
       form.reset({
         rate_type: existingRate.rate_type as RateType,
         rate_frequency: existingRate.rate_frequency as RateFrequency,
-        rate_value: String(existingRate.rate_value),
+        rate_value: safelyGetNumber(existingRate.rate_value),
         rate_currency: existingRate.rate_currency,
         orderReference: {
           type: referenceType as "PO" | "CWO" | "NONE",
@@ -127,32 +142,30 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
     }
   }, [existingRate, form, isEditing, open]);
 
-  // Handle form submission
   const onSubmit = async (data: FormData) => {
     const { error } = await tryCatch(async () => {
-      const payload = {
+      // Prepare the data with the correct reference
+      const rateData = {
         rate_type: data.rate_type,
         rate_frequency: data.rate_frequency,
-        rate_value: new Decimal(data.rate_value),
+        rate_value: data.rate_value,
         rate_currency: data.rate_currency,
         PO_id:
-          data.orderReference.type === "PO"
-            ? data.orderReference.id || null
-            : null,
+          data.orderReference.type === "PO" ? data.orderReference.id : null,
         CWO_id:
-          data.orderReference.type === "CWO"
-            ? data.orderReference.id || null
-            : null,
+          data.orderReference.type === "CWO" ? data.orderReference.id : null,
       };
 
       if (isEditing) {
         await updateRate.mutateAsync({
           id: rateId!,
-          data: payload,
+          // @ts-ignore
+          data: rateData,
         });
         toast.success("Rate updated successfully");
       } else {
-        await createRate.mutateAsync(payload);
+        // @ts-ignore
+        await createRate.mutateAsync(rateData);
         toast.success("Rate added successfully");
       }
 
@@ -196,7 +209,14 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
   ];
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        if (!isSubmitting && !open) {
+          onClose();
+        }
+      }}
+    >
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Rate" : "Add New Rate"}</DialogTitle>
@@ -233,11 +253,9 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value={RateType.charged}>
-                          Charged (to client)
+                          Charged
                         </SelectItem>
-                        <SelectItem value={RateType.paid}>
-                          Paid (to contractor)
-                        </SelectItem>
+                        <SelectItem value={RateType.paid}>Paid</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -245,71 +263,39 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
                 )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="rate_frequency"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Rate Frequency</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        value={field.value}
-                        disabled={isSubmitting}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select frequency" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value={RateFrequency.hourly}>
-                            Hourly
-                          </SelectItem>
-                          <SelectItem value={RateFrequency.daily}>
-                            Daily
-                          </SelectItem>
-                          <SelectItem value={RateFrequency.monthly}>
-                            Monthly
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="rate_currency"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Currency</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        value={field.value}
-                        disabled={isSubmitting}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select currency" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {currencies.map((currency) => (
-                            <SelectItem key={currency} value={currency}>
-                              {currency}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="rate_frequency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Rate Frequency</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      value={field.value}
+                      disabled={isSubmitting}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select frequency" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={RateFrequency.hourly}>
+                          Hourly
+                        </SelectItem>
+                        <SelectItem value={RateFrequency.daily}>
+                          Daily
+                        </SelectItem>
+                        <SelectItem value={RateFrequency.monthly}>
+                          Monthly
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}
@@ -319,10 +305,10 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
                     <FormLabel>Rate Value</FormLabel>
                     <FormControl>
                       <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="e.g., 50.00"
+                        type="text"
+                        placeholder="0.00"
                         {...field}
+                        disabled={isSubmitting}
                       />
                     </FormControl>
                     <FormMessage />
@@ -330,94 +316,111 @@ export function RateForm({ rateId, open, onClose, onSuccess }: RateFormProps) {
                 )}
               />
 
-              {/* Order Reference Selection */}
-              <div className="space-y-4">
+              <FormField
+                control={form.control}
+                name="rate_currency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Currency</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      value={field.value}
+                      disabled={isSubmitting}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select currency" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {currencies.map((currency) => (
+                          <SelectItem key={currency} value={currency}>
+                            {currency}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="orderReference.type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reference Type</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      value={field.value}
+                      disabled={isSubmitting}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select reference type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="NONE">None</SelectItem>
+                        <SelectItem value="PO">Purchase Order</SelectItem>
+                        <SelectItem value="CWO">Call-off Work Order</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {referenceType !== "NONE" && (
                 <FormField
                   control={form.control}
-                  name="orderReference.type"
+                  name="orderReference.id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Reference Type</FormLabel>
+                      <FormLabel>
+                        {referenceType === "PO"
+                          ? "Purchase Order"
+                          : "Call-off Work Order"}
+                      </FormLabel>
                       <Select
-                        onValueChange={(value) => {
-                          field.onChange(value);
-                          form.setValue("orderReference.id", "");
-                        }}
+                        onValueChange={field.onChange}
                         defaultValue={field.value}
                         value={field.value}
-                        disabled={isSubmitting || isEditing} // Cannot change reference type in edit mode
+                        disabled={isSubmitting}
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select reference type" />
+                            <SelectValue
+                              placeholder={`Select ${
+                                referenceType === "PO"
+                                  ? "purchase order"
+                                  : "call-off work order"
+                              }`}
+                            />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="NONE">None</SelectItem>
-                          <SelectItem value="PO">Purchase Order</SelectItem>
-                          <SelectItem value="CWO">
-                            Call-off Work Order
-                          </SelectItem>
+                          {referenceType === "PO"
+                            ? purchaseOrders.map((po) => (
+                                <SelectItem key={po.PO_id} value={po.PO_id}>
+                                  {po.PO_id}
+                                </SelectItem>
+                              ))
+                            : calloffWorkOrders.map((cwo) => (
+                                <SelectItem key={cwo.CWO_id} value={cwo.CWO_id}>
+                                  {cwo.CWO_id}
+                                </SelectItem>
+                              ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                {referenceType !== "NONE" && (
-                  <FormField
-                    control={form.control}
-                    name="orderReference.id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          {referenceType === "PO"
-                            ? "Purchase Order"
-                            : "Call-off Work Order"}
-                        </FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          value={field.value}
-                          disabled={isSubmitting || isEditing} // Cannot change reference in edit mode
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue
-                                placeholder={`Select a ${referenceType === "PO" ? "purchase order" : "call-off work order"}`}
-                              />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {referenceType === "PO"
-                              ? purchaseOrders.map((po) => (
-                                  <SelectItem key={po.PO_id} value={po.PO_id}>
-                                    {po.PO_id}{" "}
-                                    {po.contract?.job_title
-                                      ? `- ${po.contract.job_title}`
-                                      : ""}
-                                  </SelectItem>
-                                ))
-                              : calloffWorkOrders.map((cwo) => (
-                                  <SelectItem
-                                    key={cwo.CWO_id}
-                                    value={cwo.CWO_id}
-                                  >
-                                    {cwo.CWO_id}{" "}
-                                    {cwo.contract?.job_title
-                                      ? `- ${cwo.contract.job_title}`
-                                      : ""}
-                                  </SelectItem>
-                                ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </div>
+              )}
 
               <DialogFooter className="pt-4">
                 <Button

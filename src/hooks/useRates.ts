@@ -4,8 +4,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Rate, RateView, APIRateData } from "@/types/Rate";
 import { parseRate } from "@/lib/csv/rate";
 
-const queryClient = useQueryClient();
-
 export function useRates() {
   return useQuery<RateView[]>({
     queryKey: ["rates"],
@@ -28,6 +26,8 @@ export function useRate(id?: string) {
 }
 
 export function useDeleteRate() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (id: string) => {
       const result = await tryCatch(async () => {
@@ -45,6 +45,8 @@ export function useDeleteRate() {
 }
 
 export function useUpdateRate() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Rate> }) => {
       const result = await tryCatch(async () => {
@@ -66,6 +68,8 @@ export function useUpdateRate() {
 }
 
 export function useCreateRate() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (newRates: APIRateData | APIRateData[]) => {
       const result = await tryCatch(async () => {

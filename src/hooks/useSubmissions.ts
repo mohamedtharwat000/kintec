@@ -47,6 +47,7 @@ export function useDeleteSubmission() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["contractors"] });
     },
   });
 }
@@ -78,6 +79,7 @@ export function useUpdateSubmission() {
       queryClient.invalidateQueries({
         queryKey: ["submissions", variables.id],
       });
+      queryClient.invalidateQueries({ queryKey: ["contractors"] });
     },
   });
 }
@@ -102,6 +104,7 @@ export function useCreateSubmission() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["contractors"] });
     },
   });
 }

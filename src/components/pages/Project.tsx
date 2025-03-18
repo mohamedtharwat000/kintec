@@ -46,7 +46,7 @@ export function Project() {
   // CSV dialog state
   const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvData, setCsvData] = useState<ProjectType[]>([]);
   const [csvValidationErrors, setCsvValidationErrors] = useState<
     { row: number; error: string }[]
   >([]);
@@ -92,7 +92,13 @@ export function Project() {
 
       const result = await parseCSV(file);
       if (result.data) {
-        setCsvData(result.data.data);
+        const validProjects = result.data.data.filter(
+          (project): project is ProjectType =>
+            !!project.project_id &&
+            !!project.project_name &&
+            !!project.project_type
+        );
+        setCsvData(validProjects);
         setCsvValidationErrors(result.data.errors || []);
         setIsCSVDialogOpen(true);
       } else if (result.error) {
