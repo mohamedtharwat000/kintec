@@ -17,6 +17,9 @@ RUN pnpm dlx prisma generate
 # Copy the rest of your project files (including configuration files)
 COPY . .
 
+# Generate the Prisma client using pnpm dlx
+RUN pnpm dlx prisma generate
+
 # Expose Next.js default port
 EXPOSE 3000
 
