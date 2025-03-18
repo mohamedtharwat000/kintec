@@ -3,8 +3,8 @@ import "@/style/index.css";
 import { Providers } from "@/components/Providers";
 
 export const metadata: Metadata = {
-  title: "Kintec Mail",
-  description: "View Kintec Mails",
+  title: "Kintec DB",
+  description: "Kintec DB",
 };
 
 export default function RootLayout({
