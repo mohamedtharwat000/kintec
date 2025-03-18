@@ -3,7 +3,7 @@ import {
   Contractor,
   ContractorView,
   APIContractorData,
-} from "@/types/Contractor";
+} from "@/types/ContractorType";
 
 export const getAllContractors = async (): Promise<ContractorView[]> => {
   return prisma.contractor.findMany({

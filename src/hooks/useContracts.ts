@@ -1,7 +1,7 @@
 import axiosClient from "@/lib/axios";
 import { tryCatch } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Contract, ContractView, APIContractData } from "@/types/Contract";
+import { Contract, ContractView, APIContractData } from "@/types/ContractType";
 import { parseContract } from "@/lib/csv/contract";
 
 export function useContracts() {

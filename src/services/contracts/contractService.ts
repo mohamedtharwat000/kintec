@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { Contract, ContractView, APIContractData } from "@/types/Contract";
+import { Contract, ContractView, APIContractData } from "@/types/ContractType";
 
 export const getAllContracts = async (): Promise<Contract[]> => {
   return prisma.contract.findMany({
