@@ -28,7 +28,7 @@ export default function AppLogin() {
     );
 
     if (data?.error) {
-      toast.error("An unexpected error occurred. Please try again later.");
+      toast.error("Invalid username or password.");
       return;
     }
 
