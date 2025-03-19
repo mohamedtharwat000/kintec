@@ -1,3 +1,0 @@
-review_id,submission_id,special_review_required,reviewer_name,review_status,review_timestamp,review_rejection_reason,overall_validation_status,last_overall_validation_date,updated_by,notes
-REV-001,SUB-001,true,John Doe,approved,2024-01-15T10:00:00.000Z,,approved,2024-01-15T10:00:00.000Z,admin,All documentation complete
-,SUB-001,false,Jane Smith,rejected,2024-01-16T11:00:00.000Z,Missing signatures,rejected,2024-01-16T11:00:00.000Z,supervisor,Needs revision

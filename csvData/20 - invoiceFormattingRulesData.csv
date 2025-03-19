@@ -1,3 +1,3 @@
 inv_formatting_rule_id,invoice_id,file_format,required_invoice_fields,attachment_requirements
 IFR-001,INV-001,PDF,"invoice_number,date,amount",original_receipt_required
-,INV-001,DOCX,"reference,description",supporting_documents_needed
+IFR-002,INV-001,DOCX,"reference,description",supporting_documents_needed

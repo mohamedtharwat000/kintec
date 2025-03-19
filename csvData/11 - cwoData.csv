@@ -1,0 +1,3 @@
+CWO_id,CWO_start_date,CWO_end_date,contract_id,CWO_total_value,CWO_status,kintec_email_for_remittance
+CWO-001,2024-01-01T00:00:00.000Z,2024-12-31T00:00:00.000Z,C-002,50000,active,cwo.remittance@kintec.com
+CWO-002,2024-02-01T00:00:00.000Z,2025-01-31T00:00:00.000Z,C-001,60000,active,cwo.remittance2@kintec.com

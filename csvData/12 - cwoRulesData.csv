@@ -1,3 +1,3 @@
 CWO_rule_id,CWO_id,CWO_number_format,final_invoice_label,CWO_extension_handling,mob_demob_fee_rules
 CWOR-001,CWO-001,CWO-###,Final Invoice,Allowed,Standard
-,CWO-001,CWO-###,Final Invoice,Not Allowed,Special
+CWOR-002,CWO-001,CWO-###,Final Invoice,Not Allowed,Special

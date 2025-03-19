@@ -1,0 +1,3 @@
+bank_detail_id,contractor_id,bank_name,account_number,IBAN,SWIFT,currency,bank_detail_type,bank_detail_validated,last_updated
+BD-001,CT-001,Chase Bank,12345678,US12CHASE45678901234,CHASUS33,USD,primary,TRUE,10/15/2023
+BD-0011,CT-001,Barclays,87654321,GB29BARC20035353980931,BARCGB22,GBP,secondary,FALSE,11/20/2023

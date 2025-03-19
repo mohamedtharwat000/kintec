@@ -1,0 +1,3 @@
+contract_id,contractor_id,client_company_id,project_id,contract_start_date,contract_end_date,job_title,job_type,job_number,kintec_cost_centre_code,description_of_services,contract_status
+C-001,CT-001,CC-C2,PRJ-001,2024-01-01T00:00:00.000Z,2024-12-31T00:00:00.000Z,Job Title 1,Job Type 1,Job Number 1,Cost Centre 1,Description 1,active
+C-002,CT-001,CC-C2,PRJ-001,2024-02-01T00:00:00.000Z,2025-01-31T00:00:00.000Z,Job Title 2,Job Type 2,Job Number 2,Cost Centre 2,Description 2,terminated

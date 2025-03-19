@@ -1,3 +1,0 @@
-project_rule_id,project_id,special_project_rules,project_rules_reviewer_name,additional_review_process,major_project_indicator
-PR-001,PRJ-001,Must submit weekly reports,John Smith,required,true
-,PRJ-001,Requires manager approval for all expenses,Sarah Johnson,not_required,false

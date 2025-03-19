@@ -1,3 +1,0 @@
-visa_detail_id,contractor_id,visa_number,visa_type,visa_country,visa_expiry_date,visa_status,visa_sponsor,country_id_number,country_id_type,country_id_expiry_date,country_id_status
-VD-001,CT-L001,A12345678,work,USA,2025-03-18T14:30:00.000Z,active,ABC Corp,P98765432,passport,2025-03-18T14:30:00.000Z,active
-,CT-L001,B87654321,business,UK,2025-03-18T14:30:00.000Z,active,XYZ Ltd,N123456789,national_id,2025-03-18T14:30:00.000Z,active
