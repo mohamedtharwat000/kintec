@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { tryCatch } from "@/lib/utils";
 
 export default function AppLogin() {
   const { setAuthenticated, setUsername } = useAppStore();
@@ -19,24 +20,22 @@ export default function AppLogin() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const username = formData.get("username") as string;
-    const password = formData.get("password") as string;
-    try {
-      const res = await signIn("credentials", {
-        redirect: false,
-        username,
-        password,
-      });
-      if (res?.ok) {
-        setAuthenticated(true, username);
-        setUsername(username);
-        toast.success("Successfully logged in");
-      } else {
-        toast.error(res?.error || "Invalid credentials");
-      }
-    } catch (error) {
-      console.error("Login error:", error);
+    const username = formData.get("username");
+    const password = formData.get("password");
+
+    const { data } = await tryCatch(() =>
+      signIn("credentials", { username, password, redirect: false })
+    );
+
+    if (data?.error) {
       toast.error("An unexpected error occurred. Please try again later.");
+      return;
+    }
+
+    if (data?.url) {
+      setAuthenticated(true, username as string);
+      setUsername(username as string);
+      toast.success("Successfully logged in");
     }
   };
 

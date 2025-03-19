@@ -1,3 +1,3 @@
 common_rejection_id,common_rejection_type,resolution_process
-CR-001,contractor,Contact contractor to submit proper documentation within 48 hours. If no response received after 72 hours, escalate to project manager.
+CR-001,contractor,Contact contractor to submit proper documentation within 48 hours. If no response received after 72 hours
 ,client,Notify client of missing approvals and request immediate action. Provide templates for standard approval documentation if needed. Follow up after 24 hours.
