@@ -4,8 +4,8 @@ services:
       context: ..
       dockerfile: Dockerfile
     restart: always
-    image: kintec
-    container_name: temp
+    image: kintecc
+    container_name: tempp
     env_file:
       - .env
     ports:
