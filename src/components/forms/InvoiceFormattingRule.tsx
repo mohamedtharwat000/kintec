@@ -172,7 +172,7 @@ export function InvoiceFormattingRuleForm({
                       onValueChange={field.onChange}
                       defaultValue={field.value}
                       value={field.value}
-                      disabled={isSubmitting || isEditing}
+                      disabled={isSubmitting}
                     >
                       <FormControl>
                         <SelectTrigger>
