@@ -33,12 +33,12 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  context: { params: Promise<{ inv_for_rule_id: string }> }
+  context: { params: Promise<{ inv_form_rule_id: string }> }
 ) {
   try {
-    const { inv_for_rule_id } = await context.params;
+    const { inv_form_rule_id } = await context.params;
     const body = await request.json();
-    const updated = await updateInvoiceFormattingRule(inv_for_rule_id, body);
+    const updated = await updateInvoiceFormattingRule(inv_form_rule_id, body);
     return NextResponse.json(updated, { status: 200 });
   } catch (err) {
     const isPrismaError = err instanceof Prisma.PrismaClientKnownRequestError;
