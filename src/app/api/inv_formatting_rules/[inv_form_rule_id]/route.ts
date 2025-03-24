@@ -52,11 +52,11 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  context: { params: Promise<{ inv_for_rule_id: string }> }
+  context: { params: Promise<{ inv_form_rule_id: string }> }
 ) {
   try {
-    const { inv_for_rule_id } = await context.params;
-    await deleteInvoiceFormattingRule(inv_for_rule_id);
+    const { inv_form_rule_id } = await context.params;
+    await deleteInvoiceFormattingRule(inv_form_rule_id);
 
     return NextResponse.json(
       { message: "Invoice Formatting Rule deleted successfully" },
