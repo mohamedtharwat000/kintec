@@ -54,11 +54,11 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  context: { params: Promise<{ po_id: string }> }
+  context: { params: Promise<{ PO_id: string }> }
 ) {
   try {
-    const { po_id } = await context.params;
-    await deletePurchaseOrder(po_id);
+    const { PO_id } = await context.params;
+    await deletePurchaseOrder(PO_id);
     return NextResponse.json(
       { message: "Purchase Order deleted successfully" },
       { status: 200 }
