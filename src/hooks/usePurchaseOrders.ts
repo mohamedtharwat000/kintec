@@ -37,9 +37,9 @@ export function useDeletePurchaseOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async (po_id: string) => {
       const result = await tryCatch(async () => {
-        await axiosClient.delete(`/api/purchase_orders/${id}`);
+        await axiosClient.delete(`/api/purchase_orders/${po_id}`);
         return true;
       });
 
