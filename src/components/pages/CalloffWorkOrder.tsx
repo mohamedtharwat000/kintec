@@ -335,13 +335,13 @@ export function CalloffWorkOrder() {
       cell: ({ row }) => {
         return (
           <div className="flex justify-center gap-2">
-            <Button
+            {/* <Button
               variant="ghost"
               size="icon"
               onClick={() => handleEditClick(row.original.CWO_id)}
             >
               <Pencil className="h-4 w-4" />
-            </Button>
+            </Button> */}
             <Button
               variant="ghost"
               size="icon"

@@ -299,13 +299,13 @@ export function Review() {
       cell: ({ row }) => {
         return (
           <div className="flex justify-center gap-2">
-            <Button
+            {/* <Button
               variant="ghost"
               size="icon"
               onClick={() => handleEditClick(row.original.review_id)}
             >
               <Pencil className="h-4 w-4" />
-            </Button>
+            </Button> */}
             <Button
               variant="ghost"
               size="icon"

@@ -230,13 +230,13 @@ export function ExpenseValidationRule() {
       cell: ({ row }) => {
         return (
           <div className="flex justify-center gap-2">
-            <Button
+            {/* <Button
               variant="ghost"
               size="icon"
               onClick={() => handleEditClick(row.original.exp_val_rule_id)}
             >
               <Pencil className="h-4 w-4" />
-            </Button>
+            </Button> */}
             <Button
               variant="ghost"
               size="icon"

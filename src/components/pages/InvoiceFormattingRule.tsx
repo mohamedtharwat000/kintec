@@ -229,13 +229,13 @@ export function InvoiceFormattingRule() {
       header: "Actions",
       cell: ({ row }) => (
         <div className="flex justify-center gap-2">
-          <Button
+          {/* <Button
             variant="ghost"
             size="icon"
             onClick={() => handleEditClick(row.original.inv_formatting_rule_id)}
           >
             <Pencil className="h-4 w-4" />
-          </Button>
+          </Button> */}
           <Button
             variant="ghost"
             size="icon"

@@ -139,7 +139,7 @@ export function CwoRule() {
 
   // Find the related calloff work order for a rule
   const getCwoForRule = (cwoId: string) => {
-    return calloffWorkOrders.find(cwo => cwo.CWO_id === cwoId);
+    return calloffWorkOrders.find((cwo) => cwo.CWO_id === cwoId);
   };
 
   // Generate detail sections for the CWO rule
@@ -255,13 +255,13 @@ export function CwoRule() {
       cell: ({ row }) => {
         return (
           <div className="flex justify-center gap-2">
-            <Button
+            {/* <Button
               variant="ghost"
               size="icon"
               onClick={() => handleEditClick(row.original.CWO_rule_id)}
             >
               <Pencil className="h-4 w-4" />
-            </Button>
+            </Button> */}
             <Button
               variant="ghost"
               size="icon"
