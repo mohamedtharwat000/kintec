@@ -58,6 +58,8 @@ export async function DELETE(
 ) {
   try {
     const { po_id } = await context.params;
+    console.log("Deleting purchase order with ID:", po_id);
+
     await deletePurchaseOrder(po_id);
     return NextResponse.json(
       { message: "Purchase Order deleted successfully" },
